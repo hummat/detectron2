@@ -42,7 +42,7 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.utils.logger import setup_logger
 
-from .eval_loss_hook import LossEvalHook
+# from .eval_loss_hook import LossEvalHook
 
 
 class ReturnTransform(Transform):
