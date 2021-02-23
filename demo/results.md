@@ -24,6 +24,20 @@ Max AP @(iter, seed): [31.08041782, 249, 3]
 Mean AP: 25.9679482056
 """
 
+"""case_color -> case_color_alt
+     AP    iter    seed
+-------  ------  ------
+83.0855     199       3
+82.3906     199       4
+81.7892     250       1
+81.3987     199       0
+80.4922     199       2
+
+Mean AP: 81.8312498684
+95% conf. interv.: (80.610246993401731, 83.05225274340269)
+99% conf. interv.: (79.80649776210285, 83.85600197470157)
+"""
+
 """case_color
      AP    iter    seed
 -------  ------  ------
@@ -125,27 +139,29 @@ Mean AP: 13.650108
 """case_flat
      AP    iter    seed
 -------  ------  ------
-35.1159     199       4
-34.6628      99       1
-33.2715     250       0
-29.4427      99       2
-27.9943      99       3
+37.9188      99       4
+30.6492      99       2
+28.3007     250       1
+27.7582     250       3
+27.3472      99       0
 
-Max AP @(iter, seed): [35.11591814, 199, 4]
-Mean AP: 32.09746026390717
+Mean AP: 30.3948220079
+95% conf. interv.: (24.936443400408216, 35.853200615379841)
+99% conf. interv.: (21.343357995180796, 39.446286020607261)
 """
 
 """case_smooth
      AP    iter    seed
 -------  ------  ------
-33.0961     250       1
-32.4266      99       2
-30.2988     199       3
-29.0361      99       4
-24.8096      99       0
+30.826      199       3
+30.4206     199       1
+27.0687      99       2
+25.3446     199       0
+20.8715     199       4
 
-Max AP @(iter, seed): [33.09609897, 250, 1]
-Mean AP: 29.933437007675572
+Mean AP: 26.9062785355
+95% conf. interv.: (21.839774140433029, 31.972782930573139)
+99% conf. interv.: (18.504647666706809, 35.307909404299359)
 """
 
 """case_refined
@@ -475,6 +491,62 @@ Mean AP: 22.7311339203
 99% conf. interv.: (13.175125328365931, 32.287142512177688)
 """
 
+"""case_more_bounces
+     AP    iter    seed
+-------  ------  ------
+33.8392     250       4
+29.464      199       0
+27.0332      99       3
+26.845       99       2
+25.0345      99       1
+
+Mean AP: 28.4431639185
+95% conf. interv.: (24.217807828833145, 32.668520008100892)
+99% conf. interv.: (21.436383821943803, 35.44994401499023)
+"""
+
+"""case_texture
+     AP    iter    seed
+-------  ------  ------
+30.9322     199       4
+30.5514     250       0
+28.0481     199       3
+24.4253      99       2
+19.3334     250       1
+
+Mean AP: 26.6580865256
+95% conf. interv.: (20.639092621395172, 32.677080429795318)
+99% conf. interv.: (16.676971136880631, 36.639201914309858)
+"""
+
+"""case_color_texture
+     AP    iter    seed
+-------  ------  ------
+42.2749      99       3
+33.6543      99       0
+32.4454     199       2
+30.3339     250       1
+20.4531      99       4
+
+Mean AP: 31.8323161925
+95% conf. interv.: (22.125174403830499, 41.539457981210276)
+99% conf. interv.: (15.735256811895578, 47.929375573145194)
+"""
+
+"""case_2048_samples
+     AP    iter    seed
+-------  ------  ------
+25.5179     199       4
+23.7742      99       2
+22.7371      99       3
+22.5864      99       1
+20.1015     199       0
+
+Mean AP: 22.9434310946
+95% conf. interv.: (20.49412805419734, 25.392734134947169)
+99% conf. interv.: (18.881826006244705, 27.005036182899804)
+"""
+
 Important:
 * color
 * distance
@@ -490,6 +562,7 @@ Maybe important:
 * correct color
 * cam intrinsic (fov=1 is better than the wrong K matrix)
 * average bbox size (i.e. distance)
+* object texture
 
 Unimportant:
 * light direction
@@ -502,6 +575,5 @@ Maybe unimportant
 
 Questions:
 * Why are more samples worse?
-* Why are more bounces worse?
 * Do I have the correct camera intrinsics and if so, why do they perform worse?
-* Why is higher resolution worse? (object )
+* Why is higher resolution worse?

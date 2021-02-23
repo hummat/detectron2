@@ -823,8 +823,7 @@ def main(visualize=False):
 
     base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
     output_dir = "/home/matthias/Data/Ubuntu/data/justin_training"
-    cfg = build_config(train_datasets=("case_color",), base_config=base_config, output_dir=output_dir, epochs=2)
-    cfg.DATASETS.TEST = ("case_color_alt",)
+    cfg = build_config(train_datasets=("case_smooth",), base_config=base_config, output_dir=output_dir, epochs=2)
 
     if visualize:
         trainer = Trainer(cfg)
@@ -855,14 +854,17 @@ def main(visualize=False):
                                27.09203161, 26.40146892, 23.90050957, 23.23194967, 22.82641386],  # checked
                 "case_green": [42.07711803, 33.84280772, 33.08787521, 31.47131132, 30.18678932],  # checked
                 "case_white": [21.0838, 17.2644, 12.5009, 11.3386, 6.06284],
-                "case_flat": [35.1159, 34.6628, 33.2715, 29.4427, 27.9943],
-                "case_smooth": [33.0961, 32.4266, 30.2988, 29.0361, 24.8096],
+                "case_flat": [37.91878455, 30.64923742, 28.30067853, 27.75824945, 27.34716009],  # checked
+                "case_smooth": [30.82600167, 30.42064908, 27.06868854, 25.34457596, 20.87147743],  # checked
                 "case_refined": [22.3332, 21.3385, 21.0649, 18.4229, 14.5228],
                 "case_cam_k": [29.96887896, 26.99492782, 22.50186606, 16.9611616, 15.7358362],  # checked
                 "case_all_white": [12.8596, 12.1132, 10.5135, 10.4775, 8.79655],
                 "case_50_samples": [29.6049, 23.6589, 23.5817, 21.2605, 20.5096],
                 "case_512_samples": [26.1091, 23.8615, 22.8284, 21.5225, 9.46198],
-                "case_bounces": [21.7743, 17.1064, 15.3416, 13.9415, 9.50011],
+                "case_2048_samples": [25.51789534, 23.77423735, 22.73706366, 22.58643221, 20.10152691],  # checked
+                "case_color_texture": [42.27489632, 33.6542957, 32.44540635, 30.33389404, 20.45308856],  # checked
+                "case_texture": [30.93216935, 30.5514081, 28.04813986, 24.42527646, 19.33343886],  # checked
+                "case_more_bounces": [33.83921761, 29.46399028, 27.03319279, 26.84496801, 25.03445091],  # checked
                 "case_area_light": [28.64929296, 26.14490815, 21.8578116, 19.71479663, 17.28886026],  # checked
                 "case_cam_uniform3d_inplane": [31.96673795, 31.26197291, 30.49044743, 24.15643791, 23.57493626],  # checked
                 "case_cam_uniform3d": [26.97584852, 26.62969497, 26.14628782, 21.09606741, 20.16900372],  # checked
