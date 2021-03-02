@@ -8,6 +8,7 @@ from torch import Tensor, nn
 
 from detectron2 import model_zoo
 from detectron2.config import get_cfg
+from detectron2.export.flatten import TracingAdapter, flatten_to_tuple
 from detectron2.export.torchscript import dump_torchscript_IR, export_torchscript_with_instances
 from detectron2.export.torchscript_patch import patch_builtin_len
 from detectron2.layers import ShapeSpec
@@ -16,7 +17,12 @@ from detectron2.modeling.postprocessing import detector_postprocess
 from detectron2.modeling.roi_heads import KRCNNConvDeconvUpsampleHead
 from detectron2.structures import Boxes, Instances
 from detectron2.utils.env import TORCH_VERSION
-from detectron2.utils.testing import assert_instances_allclose, get_sample_coco_image, random_boxes
+from detectron2.utils.testing import (
+    assert_instances_allclose,
+    convert_scripted_instances,
+    get_sample_coco_image,
+    random_boxes,
+)
 
 
 """
@@ -52,9 +58,7 @@ class TestScripting(unittest.TestCase):
         inputs = [{"image": get_sample_coco_image()}]
         with torch.no_grad():
             instance = model.inference(inputs, do_postprocess=False)[0]
-            scripted_instance = script_model.inference(inputs, do_postprocess=False)[
-                0
-            ].to_instances()
+            scripted_instance = script_model.inference(inputs, do_postprocess=False)[0]
         assert_instances_allclose(instance, scripted_instance)
 
     def _test_retinanet_model(self, config_path):
@@ -72,7 +76,7 @@ class TestScripting(unittest.TestCase):
         inputs = [{"image": img}]
         with torch.no_grad():
             instance = model(inputs)[0]["instances"]
-            scripted_instance = script_model(inputs)[0].to_instances()
+            scripted_instance = convert_scripted_instances(script_model(inputs)[0])
             scripted_instance = detector_postprocess(scripted_instance, img.shape[1], img.shape[2])
         assert_instances_allclose(instance, scripted_instance)
         # Note that the model currently cannot be saved and loaded into a new process:
@@ -83,77 +87,33 @@ class TestScripting(unittest.TestCase):
 class TestTracing(unittest.TestCase):
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA not available")
     def testMaskRCNN(self):
-        class WrapModel(nn.ModuleList):
-            def forward(self, image):
-                inputs = [{"image": image}]
-                outputs = self[0].inference(inputs, do_postprocess=False)[0]
-                size = outputs.image_size
-                if torch.jit.is_tracing():
-                    assert isinstance(size, torch.Tensor)
-                else:
-                    size = torch.as_tensor(size)
-                return (
-                    size,
-                    outputs.pred_classes,
-                    outputs.pred_boxes.tensor,
-                    outputs.scores,
-                    outputs.pred_masks,
-                )
+        def inference_func(model, image):
+            inputs = [{"image": image}]
+            return model.inference(inputs, do_postprocess=False)[0]
 
-            @staticmethod
-            def convert_output(output):
-                r = Instances(tuple(output[0]))
-                r.pred_classes = output[1]
-                r.pred_boxes = Boxes(output[2])
-                r.scores = output[3]
-                r.pred_masks = output[4]
-                return r
-
-        self._test_model("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml", WrapModel)
+        self._test_model("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml", inference_func)
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA not available")
     def testRetinaNet(self):
-        class WrapModel(nn.ModuleList):
-            def forward(self, image):
-                inputs = [{"image": image}]
-                outputs = self[0].forward(inputs)[0]["instances"]
-                size = outputs.image_size
-                if torch.jit.is_tracing():
-                    assert isinstance(size, torch.Tensor)
-                else:
-                    size = torch.as_tensor(size)
-                return (
-                    size,
-                    outputs.pred_classes,
-                    outputs.pred_boxes.tensor,
-                    outputs.scores,
-                )
+        def inference_func(model, image):
+            return model.forward([{"image": image}])[0]["instances"]
 
-            @staticmethod
-            def convert_output(output):
-                r = Instances(tuple(output[0]))
-                r.pred_classes = output[1]
-                r.pred_boxes = Boxes(output[2])
-                r.scores = output[3]
-                return r
+        self._test_model("COCO-Detection/retinanet_R_50_FPN_3x.yaml", inference_func)
 
-        self._test_model("COCO-Detection/retinanet_R_50_FPN_3x.yaml", WrapModel)
-
-    def _test_model(self, config_path, WrapperCls):
-        # TODO wrapper should be handled by export API in the future
+    def _test_model(self, config_path, inference_func):
         model = model_zoo.get(config_path, trained=True)
         image = get_sample_coco_image()
 
-        model = WrapperCls([model])
-        model.eval()
-        with torch.no_grad(), patch_builtin_len():
+        wrapper = TracingAdapter(model, image, inference_func)
+        wrapper.eval()
+        with torch.no_grad():
             small_image = nn.functional.interpolate(image, scale_factor=0.5)
             # trace with a different image, and the trace must still work
-            traced_model = torch.jit.trace(model, (small_image,))
+            traced_model = torch.jit.trace(wrapper, (small_image,))
 
-            output = WrapperCls.convert_output(model(image))
-            traced_output = WrapperCls.convert_output(traced_model(image))
-        assert_instances_allclose(output, traced_output)
+            output = inference_func(model, image)
+            traced_output = wrapper.outputs_schema(traced_model(image))
+        assert_instances_allclose(output, traced_output, size_as_tensor=True)
 
     def testKeypointHead(self):
         class M(nn.Module):
@@ -214,3 +174,25 @@ class TestTorchscriptUtils(unittest.TestCase):
             for name in ["model_ts_code", "model_ts_IR", "model_ts_IR_inlined", "model"]:
                 fname = os.path.join(d, name + ".txt")
                 self.assertTrue(os.stat(fname).st_size > 0, fname)
+
+    def test_flatten_basic(self):
+        obj = [3, ([5, 6], {"name": [7, 9], "name2": 3})]
+        res, schema = flatten_to_tuple(obj)
+        self.assertEqual(res, (3, 5, 6, 7, 9, 3))
+        new_obj = schema(res)
+        self.assertEqual(new_obj, obj)
+
+        _, new_schema = flatten_to_tuple(new_obj)
+        self.assertEqual(schema, new_schema)  # test __eq__
+
+    def test_flatten_instances_boxes(self):
+        inst = Instances(
+            torch.tensor([5, 8]), pred_masks=torch.tensor([3]), pred_boxes=Boxes(torch.ones((1, 4)))
+        )
+        obj = [3, ([5, 6], inst)]
+        res, schema = flatten_to_tuple(obj)
+        self.assertEqual(res[:3], (3, 5, 6))
+        for r, expected in zip(res[3:], (inst.pred_boxes.tensor, inst.pred_masks, inst.image_size)):
+            self.assertIs(r, expected)
+        new_obj = schema(res)
+        assert_instances_allclose(new_obj[1][1], inst, rtol=0.0, size_as_tensor=True)
