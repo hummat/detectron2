@@ -7,12 +7,13 @@ import multiprocessing
 import time
 import sys
 import warnings
+import argparse
 
 import tabulate
 import yaml
 import cv2
 import torch
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Union
 import numpy as np
 from PIL import Image, ImageStat
 from skimage.util import random_noise
@@ -25,6 +26,8 @@ from colour_demosaicing import (demosaicing_CFA_Bayer_bilinear, mosaicing_CFA_Ba
                                 demosaicing_CFA_Bayer_Menon2007)
 from colour import cctf_encoding
 from colour.utilities import as_float_array
+import skopt
+from autoaugment import ImageNetPolicy
 
 from detectron2.engine import DefaultPredictor
 from detectron2 import model_zoo
@@ -42,6 +45,8 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.utils.logger import setup_logger
 
+from utils import get_space, get_param_names, set_cfg_values
+
 # from .eval_loss_hook import LossEvalHook
 
 
@@ -56,8 +61,21 @@ class ReturnTransform(Transform):
     def apply_coords(self, coords):
         return coords
 
+    def apply_segmentation(self, segmentation):
+        return segmentation
+
     def inverse(self):
-        return self
+        return transforms.NoOpTransform()
+
+
+class AutoAugment(Augmentation):
+    def __init__(self):
+        super().__init__()
+        self._init(locals())
+        self.policy = ImageNetPolicy()
+
+    def get_transform(self, image):
+        return ReturnTransform(image=np.asarray(self.policy(Image.fromarray(image))))
 
 
 class Mosaic(Augmentation):
@@ -80,7 +98,7 @@ class Denoise(Augmentation):
     def _run(self, img):
         img = img.copy().astype(float) / 255.
         if self.mode == 'wavelet':
-            img = denoise_wavelet(img, multichannel=True, rescale_sigma=True)
+            img = denoise_wavelet(img, multichannel=len(img.shape) == 3 and img.shape[2] == 3, rescale_sigma=True)
         return (img * 255.).astype(np.uint8)
 
     def get_transform(self, image):
@@ -109,18 +127,18 @@ class AddNoise(Augmentation):
         else:
             types = self.types
 
-        for t in types:
-            if t == 'gaussian':
+        for _type in types:
+            if _type == 'gaussian':
                 noise = self.gaussian(image=noise)['image']
-            elif t == 'speckle':
-                noise = random_noise(noise, t, var=self._get_amount())
-            elif t == 'poisson':
+            elif _type == 'speckle':
+                noise = random_noise(noise, _type, var=self._get_amount())
+            elif _type == 'poisson':
                 w = min(1., 1000. * self._get_amount())
-                noise = random_noise(noise, t) * w + (1. - w) * noise
-            elif t == 's&p':
-                noise = random_noise(noise, t, amount=.1 * self._get_amount())
+                noise = random_noise(noise, _type) * w + (1. - w) * noise
+            elif _type == 's&p':
+                noise = random_noise(noise, _type, amount=.1 * self._get_amount())
             else:
-                raise ValueError("Unknown noise type: {}".format(t))
+                raise ValueError("Unknown noise type: {}".format(_type))
         return (noise * 255.).astype(np.uint8)
 
     def get_transform(self, image):
@@ -131,10 +149,15 @@ class Photometric(Augmentation):
     def __init__(self, types, amount, random_types=True):
         super().__init__()
         self._init(locals())
+        if isinstance(amount, (list, tuple)):
+            assert len(types) == len(amount)
 
-    def _get_amount(self):
-        if isinstance(self.amount, list) or isinstance(self.amount, tuple):
-            return random.uniform(self.amount[0], self.amount[1])
+    def _get_amount(self, idx):
+        if isinstance(self.amount, (list, tuple)):
+            if isinstance(self.amount[idx], (list, tuple)):
+                return random.uniform(self.amount[idx][0], self.amount[idx][1])
+            else:
+                return self.amount[idx]
         else:
             return self.amount
 
@@ -146,13 +169,16 @@ class Photometric(Augmentation):
             types = self.types
 
         if 'brightness' in types:
-            composition.append(transforms.RandomBrightness(1. - self._get_amount(), 1. + self._get_amount()))
+            offset = self._get_amount(self.types.index('brightness'))
+            composition.append(transforms.RandomBrightness(1. - offset, 1. + offset))
         if 'contrast' in types:
-            composition.append(transforms.RandomContrast(1. - self._get_amount(), 1. + self._get_amount()))
+            offset = self._get_amount(self.types.index('contrast'))
+            composition.append(transforms.RandomContrast(1. - offset, 1. + offset))
         if 'lighting' in types:
-            composition.append(transforms.RandomLighting(self._get_amount()))
+            composition.append(transforms.RandomLighting(self._get_amount(self.types.index('lighting'))))
         if 'saturation' in types:
-            composition.append(transforms.RandomSaturation(1. - self._get_amount(), 1. + self._get_amount()))
+            offset = self._get_amount(self.types.index('saturation'))
+            composition.append(transforms.RandomSaturation(1. - offset, 1. + offset))
 
         random.shuffle(composition)
         augs = transforms.AugmentationList(composition)
@@ -174,7 +200,7 @@ class Cutout(Augmentation):
                                       p=p)
 
     def get_transform(self, image):
-        return ReturnTransform(image=self.cutout(image=image, fill_value=random.randint(0, 255))['image'])
+        return ReturnTransform(image=self.cutout(image=image)['image'])
 
 
 class Flip(Augmentation):
@@ -281,6 +307,11 @@ class ApplyAEAug(Augmentation):
 
 class Trainer(DefaultTrainer):
     @classmethod
+    def build_model(cls, cfg):
+        model = build_model(cfg)
+        return model
+
+    @classmethod
     def build_optimizer(cls, cfg, model):
         if cfg.OPTIMIZER.lower() == "adam":
             norm_module_types = (
@@ -323,7 +354,9 @@ class Trainer(DefaultTrainer):
 
     @classmethod
     def build_evaluator(cls, cfg, dataset_name):
-        return COCOEvaluator(cfg.DATASETS.TEST[0], output_dir=cfg.OUTPUT_DIR)
+        return COCOEvaluator(cfg.DATASETS.TEST[0],
+                             tasks=('bbox',) if "justin" in cfg.DATASETS.TEST[0] else None,
+                             output_dir=cfg.OUTPUT_DIR)
 
     """
     def build_hooks(self):
@@ -363,12 +396,13 @@ class Trainer(DefaultTrainer):
         if cfg.CHANNEL_DROPOUT:
             augmentations.append(ApplyAEAug(A.ChannelDropout, channel_drop_range=(1, 2), p=cfg.CHANNEL_DROPOUT))
         if cfg.GRAYSCALE:
-            augmentations.append(ApplyAEAug(A.ToGray, always_apply=True))
-        if cfg.CUTOUT:
-            augmentations.append(Cutout(holes=cfg.CUTOUT_HOLES, size=cfg.CUTOUT_SIZES, p=cfg.CUTOUT))
+            augmentations.append(ApplyAEAug(A.ToGray, p=cfg.GRAYSCALE))
         if cfg.PHOTOMETRIC:
-            augmentations.append(
-                Photometric(types=cfg.PHOTOMETRIC_TYPES, amount=cfg.PHOTOMETRIC, random_types=cfg.RANDOM_TYPES))
+            augmentations.append(Photometric(types=cfg.PHOTOMETRIC_TYPES,
+                                             amount=cfg.PHOTOMETRIC,
+                                             random_types=cfg.RANDOM_TYPES))
+        if cfg.AUTO_AUGMENT:
+            augmentations.append(AutoAugment())
         if cfg.CLAHE:
             augmentations.append(ApplyAEAug(A.CLAHE, p=cfg.CLAHE))
         if cfg.CHROMATIC_ABERRATION:
@@ -376,27 +410,33 @@ class Trainer(DefaultTrainer):
         if cfg.VIGNETTE:
             augmentations.append(Vignetting(strength=cfg.VIGNETTE))
         if cfg.MOTION_BLUR:
-            augmentations.append(ApplyAEAug(A.MotionBlur, blur_limit=cfg.MB_KERNEL_SIZE, p=cfg.MOTION_BLUR))
+            augmentations.append(ApplyAEAug(A.MotionBlur, blur_limit=cfg.KERNEL_SIZE, p=cfg.MOTION_BLUR))
+        if cfg.GAUSSIAN_BLUR:
+            augmentations.append(ApplyAEAug(A.GaussianBlur, blur_limit=cfg.KERNEL_SIZE, p=cfg.GAUSSIAN_BLUR))
         if cfg.NOISE:
             augmentations.append(AddNoise(types=cfg.NOISE_TYPES, amount=cfg.NOISE, random_types=cfg.RANDOM_TYPES))
         if cfg.CAM_NOISE:
-            augmentations.append(ApplyAEAug(A.ISONoise, color_shift=cfg.CAM_NOISE_SHIFT, intensity=cfg.CAM_NOISE,
-                                            always_apply=True))
+            augmentations.append(ApplyAEAug(A.ISONoise,
+                                            color_shift=cfg.CAM_NOISE_SHIFT,
+                                            intensity=cfg.CAM_NOISE,
+                                            p=cfg.CAM_NOISE[1]))
         if cfg.MOSAIC:
             augmentations.append(Mosaic())
         if cfg.SHARPEN:
-            augmentations.append(ApplyAEAug(A.IAASharpen, p=cfg.SHARPEN))
+            augmentations.append(ApplyAEAug(A.IAASharpen, alpha=cfg.SHARPEN_RANGE, p=cfg.SHARPEN))
         if cfg.DENOISE:
             augmentations.append(Denoise())
         if cfg.FDA:
-            augmentations.append(ApplyAEAug(A.FDA, reference_images=cfg.REFERENCE, beta_limit=cfg.FDA,
-                                            always_apply=True))
+            augmentations.append(ApplyAEAug(A.FDA, reference_images=cfg.REFERENCE, p=cfg.FDA))
         if cfg.HISTOGRAM:
             augmentations.append(ApplyAEAug(A.HistogramMatching, reference_images=cfg.REFERENCE,
-                                            blend_ratio=cfg.HISTOGRAM, always_apply=True))
+                                            blend_ratio=cfg.HISTOGRAM, p=cfg.HISTOGRAM[1]))
         if cfg.JPEG:
-            augmentations.append(ApplyAEAug(A.JpegCompression, always_apply=True))
-        mapper = DatasetMapper(is_train=True, augmentations=augmentations, image_format='BGR')
+            augmentations.append(ApplyAEAug(A.JpegCompression, p=cfg.JPEG))
+        if cfg.CUTOUT:
+            augmentations.append(Cutout(holes=cfg.CUTOUT_HOLES, size=cfg.CUTOUT_SIZES, p=cfg.CUTOUT))
+        mapper = DatasetMapper(is_train=True, use_instance_mask=cfg.MODEL.MASK_ON, instance_mask_format='bitmask',
+                               augmentations=augmentations, image_format='BGR')
         return build_detection_train_loader(cfg, mapper, num_workers=cfg.DATALOADER.NUM_WORKERS)
 
 
@@ -600,7 +640,7 @@ def set_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
 
 
-def build_config(train_datasets, base_config, output_dir, epochs=2):
+def build_config(train_datasets, base_config, output_dir, epochs=2.):
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file(base_config))
 
@@ -625,22 +665,22 @@ def build_config(train_datasets, base_config, output_dir, epochs=2):
     cfg.EPOCHS = epochs
 
     cfg.SOLVER.BASE_LR = .0001
-    cfg.SOLVER.MAX_ITER = cfg.EPOCHS * cfg.NUM_BATCHES
+    cfg.SOLVER.MAX_ITER = int(cfg.EPOCHS * cfg.NUM_BATCHES)
     cfg.SOLVER.CHECKPOINT_PERIOD = cfg.NUM_BATCHES  # Checkpoint every epoch
-    cfg.SOLVER.WEIGHT_DECAY = 0.
+    cfg.SOLVER.WEIGHT_DECAY = 0.  # 0.00001
     cfg.SOLVER.MOMENTUM = .9
     cfg.SOLVER.NESTEROV = False
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"
     # Linear warm up to base learning rate within one 10th of all iterations
-    cfg.SOLVER.WARMUP_ITERS = 1.  # int(round(cfg.SOLVER.MAX_ITER * 0.2))
-    cfg.SOLVER.WARMUP_FACTOR = 1. / float(cfg.SOLVER.WARMUP_ITERS)
+    cfg.SOLVER.WARMUP_ITERS = 1.  # int(round(cfg.SOLVER.MAX_ITER * 0.1))
+    cfg.SOLVER.WARMUP_FACTOR = 1. / cfg.SOLVER.WARMUP_ITERS
     cfg.SOLVER.WARMUP_METHOD = "linear"
     cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE = "norm"
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = .001
     cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.
     # Reduce learning rate by a factor of 10 every 2 epochs
-    cfg.SOLVER.STEPS = (1,)  # list(cfg.NUM_BATCHES * np.arange(1, cfg.EPOCHS, 2))
+    cfg.SOLVER.STEPS = (1,)  # [fraction * cfg.SOLVER.MAX_ITER for fraction in [0.75]]
     cfg.SOLVER.GAMMA = 1.
 
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_config)
@@ -653,6 +693,7 @@ def build_config(train_datasets, base_config, output_dir, epochs=2):
     cfg.TEST.DETECTIONS_PER_IMAGE = 100
     cfg.MODEL.RETINANET.NUM_CLASSES = 1
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
+    cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES = 1
 
     cfg.OPTIMIZER = "ADAM"
     cfg.LOGGER = True
@@ -663,28 +704,32 @@ def build_config(train_datasets, base_config, output_dir, epochs=2):
     cfg.INTERP = Image.BILINEAR
     cfg.NOISE = []
     cfg.NOISE_TYPES = ['poisson', 'gaussian', 'speckle', 's&p']
-    cfg.CAM_NOISE = []  # [0.1, 0.5]
-    cfg.CAM_NOISE_SHIFT = []  # [0.01, 0.05]
+    cfg.CAM_NOISE = []
+    cfg.CAM_NOISE_SHIFT = [0.01, 0.05]
     cfg.RANDOM_TYPES = True
     cfg.DENOISE = False
     cfg.CUTOUT = 0.
     cfg.CUTOUT_SIZES = [100, 100, None, None]
     cfg.CUTOUT_HOLES = [5, 1]
     cfg.MOTION_BLUR = 0.
-    cfg.MB_KERNEL_SIZE = 51
+    cfg.GAUSSIAN_BLUR = 0.
+    cfg.KERNEL_SIZE = 11
     cfg.FLIP = "both"
     cfg.INVERT = 0.
-    cfg.GRAYSCALE = False
+    cfg.GRAYSCALE = 0.
     cfg.CHANNEL_DROPOUT = 0.
     cfg.HISTOGRAM = []
     cfg.FDA = 0.
     cfg.REFERENCE = [sample['file_name'] for sample in random.sample(DatasetCatalog.get(cfg.DATASETS.TEST[0]), 100)]
     cfg.SHARPEN = 0.
+    cfg.SHARPEN_RANGE = [0.2, .5]
     cfg.CLAHE = 0.
     cfg.MOSAIC = False
     cfg.JPEG = False
-    cfg.VIGNETTE = 0.  # (0.3, 0.8)
-    cfg.CHROMATIC_ABERRATION = 0.  # (0., 0.2)
+    cfg.VIGNETTE = 0.  # (0., 0.8)
+    cfg.CHROMATIC_ABERRATION = 0.  # (0., 0.5)
+    cfg.AUTO_AUGMENT = False
+    # gaussian blur, contrast, brightness, color and sharpness filters, cutout
 
     cfg.OUTPUT_DIR = output_dir
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
@@ -702,8 +747,8 @@ def get_model(cfg):
 def train_eval(cfg, resume=False):
     trainer = Trainer(cfg)
     trainer.resume_or_load(resume)
-
     trainer.train()
+
     ap_it = np.array(trainer.storage.history(name='bbox/AP').values())
     ap = ap_it[:, 0]
     it = ap_it[:, 1]
@@ -735,11 +780,14 @@ def predict(cfg, dataset="", image_path=""):
 def load_datasets(train_root, eval_root):
     load_data(eval_root, splits=['val', 'test', 'train'])
 
+    names = list()
     top = os.path.join(train_root, "case")
     for dirpath, dirnames, filenames in os.walk(top):
         for name in dirnames:
+            names.append(name)
             register_coco_instances(name, {}, os.path.join(top, name, "coco_annotations.json"), os.path.join(top, name))
         break
+    return names
 
 
 def compute_data_statistics(loader):
@@ -812,46 +860,22 @@ def compute_data_statistics(loader):
     print(np.histogram(brightness)[0])
 
 
-def main(visualize=False):
-    start = time.time()
-    set_seed(42)
-    setup_logger(name="case")
+def load_and_apply_cfg_values(cfg, output_dir, results_name="skopt_results.pkl"):
+    res = skopt.load(os.path.join(output_dir, results_name))
+    augmentation_values = dict()
+    for k, v in zip(get_param_names(get_space()), res.x):
+        augmentation_values[k] = v
+    set_cfg_values(cfg, augmentation_values=augmentation_values)
 
-    train_root = "/home/matthias/Data/Ubuntu/data/datasets"
-    eval_root = "/home/matthias/Data/Ubuntu/data/datasets/justin"
-    load_datasets(train_root, eval_root)
 
-    base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-    output_dir = "/home/matthias/Data/Ubuntu/data/justin_training"
-    cfg = build_config(train_datasets=("case_smooth",), base_config=base_config, output_dir=output_dir, epochs=2)
-
-    if visualize:
-        trainer = Trainer(cfg)
-        loader = trainer.build_train_loader(cfg)
-        # compute_data_statistics(loader)
-        visualize_data(cfg, loader)
-
-    results = list()
-    for seed in np.arange(5):
-        set_seed(seed)
-        ap, it = train_eval(cfg, resume=False)
-        result = np.vstack([ap, it]).T
-        result = result[result[:, 0].argmax()].tolist()
-        result.append(seed)
-        results.append(result)
-    results = np.array(results)
-
-    ap = results[:, 0]
-    print(tabulate.tabulate(results[ap.argsort()[::-1]], headers=["AP", "iter", "seed"]))
-    print()
-    print("Mean AP:", ap.mean())
-    print("95% conf. interv.:", t.interval(0.95, len(ap) - 1, loc=np.mean(ap), scale=sem(ap)))
-    print("99% conf. interv.:", t.interval(0.99, len(ap) - 1, loc=np.mean(ap), scale=sem(ap)))
-    print("Copy:", np.sort(ap)[::-1])
-    print()
-
+def get_results_dict():
     res_dict = {"case_color": [40.20318213, 35.35496166, 31.02521989, 29.54828771, 27.14293436,
                                27.09203161, 26.40146892, 23.90050957, 23.23194967, 22.82641386],  # checked
+                "case_new_cam_tless": [45.47795505, 44.66041727, 40.51798259, 36.96881034, 29.26575374],
+                "case_new_cam": [44.75878892, 42.88613014, 39.33238446, 32.79025745, 32.22301464],
+                "case_new_cam_a": [40.63473765, 33.00102775, 31.36526296, 30.9117473, 30.7852782],
+                "case_new_cam_b": [41.39483998, 39.97691288, 38.96729607, 37.88191947, 34.72803834],
+                "case_best_off": [38.27442956, 36.98222766, 33.18468101, 32.26386027, 30.13600164],  # checked
                 "case_green": [42.07711803, 33.84280772, 33.08787521, 31.47131132, 30.18678932],  # checked
                 "case_white": [21.0838, 17.2644, 12.5009, 11.3386, 6.06284],
                 "case_flat": [37.91878455, 30.64923742, 28.30067853, 27.75824945, 27.34716009],  # checked
@@ -887,17 +911,84 @@ def main(visualize=False):
                 "case_no_glossy": [35.6989, 29.8466, 29.3413, 25.6552, 17.015],  # checked
                 "case_no_rough": [35.69471537, 33.93573952, 30.49634283, 30.43674663, 24.45885994],  # checked
                 "case_no_point_light": [40.83368553, 34.71397511, 32.09706752, 27.477971, 25.45296477]}  # checked
+    return res_dict
 
-    for k, v in res_dict.items():
+
+def main(seed=42):
+    start = time.time()
+    set_seed(seed)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", default='all', type=str,
+                        help="List of datasets used for training.")
+    parser.add_argument("--visualize", default=False, type=bool, help="Visualize training data.")
+    args = parser.parse_args()
+
+    train_root = "/home/matthias/Data/Ubuntu/data/datasets"
+    eval_root = "/home/matthias/Data/Ubuntu/data/datasets/justin"
+    dataset_names = load_datasets(train_root, eval_root)
+
+    base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"  # "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
+    output_dir = "/home/matthias/Data/Ubuntu/data/justin_training"
+
+    if isinstance(args.data, str):
+        assert (args.data in dataset_names or args.data in ['all', 'best'])
+        train_datasets = list()
+        if args.data == 'all':
+            train_datasets = dataset_names
+        elif args.data == 'best':
+            best_datasets = list()
+            for k, v in get_results_dict().items():
+                best_datasets.append([np.mean(v), np.max(v)])
+            best_mean = np.quantile(np.array(best_datasets)[:, 0], q=.9)
+            best_max = np.quantile(np.array(best_datasets)[:, 1], q=.9)
+            for k, v in get_results_dict().items():
+                if np.mean(v) >= best_mean or np.max(v) >= best_max:
+                    train_datasets.append(k)
+        else:
+            train_datasets.append(args.data)
+    elif isinstance(args.data, (list, tuple)):
+        train_datasets = args.data
+    else:
+        raise AttributeError
+    cfg = build_config(train_datasets=train_datasets, base_config=base_config, output_dir=output_dir, epochs=2.)
+    # load_and_apply_cfg_values(cfg, output_dir)
+
+    if args.visualize:
+        trainer = Trainer(cfg)
+        loader = trainer.build_train_loader(cfg)
+        # compute_data_statistics(loader)
+        visualize_data(cfg, loader)
+
+    results = list()
+    for s in np.arange(5):
+        set_seed(s)
+        ap, it = train_eval(cfg)
+        result = np.vstack([ap, it]).T
+        result = result[result[:, 0].argmax()].tolist()
+        result.append(s)
+        results.append(result)
+    results = np.array(results)
+
+    ap = results[:, 0]
+    table = tabulate.tabulate(results[ap.argsort()[::-1]], headers=["AP", "iter", "seed"])
+
+    logger = setup_logger(output=os.path.join(output_dir, f"{args.data}.log"), name=__file__)
+    logger.info(table)
+    logger.info(f"Mean AP: {ap.mean()}")
+    logger.info(f"95% conf. interv.: {t.interval(0.95, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
+    logger.info(f"99% conf. interv.: {t.interval(0.99, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
+    logger.info(f"Copy: {np.sort(ap)[::-1]}")
+
+    for k, v in get_results_dict().items():
         # The probability to obtain the current result by chance (assuming the same data generating process) is ...
-        print(f"Statistics for {cfg.DATASETS.TRAIN[0]} vs {k}:")
-        print(ttest_ind(ap, v, equal_var=False))
-        print(f"99% conf. interv. of {k}:", t.interval(0.99, len(v) - 1, loc=np.mean(v), scale=sem(v)))
-        print()
+        logger.info(f"Statistics for {cfg.DATASETS.TRAIN[0]} vs {k}:")
+        logger.info(ttest_ind(ap, v, equal_var=False))
+        logger.info(f"99% conf. interv. of {k}: {t.interval(0.99, len(v) - 1, loc=np.mean(v), scale=sem(v))}")
         # ... or less.
 
-    print("Runtime:", (time.time() - start) / 60)
+    logger.info(f"Runtime: {(time.time() - start) / 60}")
 
 
 if __name__ == "__main__":
-    main(visualize=False)
+    main()
