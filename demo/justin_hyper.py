@@ -16,31 +16,16 @@ def main(seed):
     eval_root = "/home/matthias/Data/Ubuntu/data/datasets/justin"
     load_datasets(train_root, eval_root)
 
-    base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"  # "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
+    base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"  # "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
     output_dir = "/home/matthias/Data/Ubuntu/data/justin_training"
 
-    train_datasets = list()
-    top = os.path.join(train_root, "case")
-    for dirpath, dirnames, filenames in os.walk(top):
-        for name in dirnames:
-            train_datasets.append(name)
-
-    # for k, v in get_results_dict().items():
-    #     if np.mean(v) > 30 or np.max(v) > 40:
-    #         train_datasets.append(k)
-
     space = get_space()
-    cfg = build_config(train_datasets, base_config, output_dir, epochs=1)
 
     @skopt.utils.use_named_args(dimensions=space)
     def objective(**params):
-        set_cfg_values(cfg, training_values={"learning_rate": 0.00025,
-                                             "warmup_fraction": 0.,
-                                             "reduce_lr": 0.1,
-                                             "weight_decay": 0.00001,
-                                             "clip_gradients": False,
-                                             "lr_scheduler": "WarmupMultiStepLR"},
-                       augmentation_values=params)
+        cfg = build_config(("case_new_cam_tless", "case_new_cam_tless_a"), base_config, output_dir,
+                           batch_size=params["batch_size"], epochs=1.)
+        set_cfg_values(cfg, params)
         print(tabulate.tabulate(np.expand_dims(list(params.values()), axis=0), headers=list(params.keys())))
         try:
             ap, it = train_eval(cfg)
@@ -73,7 +58,62 @@ def main(seed):
 
 
 if __name__ == "__main__":
-    main(seed=789)
+    main(seed=13)
+
+"""seed 13
+      AP    learning_rate    batch_size  optimizer      weight_decay    momentum  lr_scheduler         warmup_fraction  clip_gradients      reduce_lr
+--------  ---------------  ------------  -----------  --------------  ----------  -----------------  -----------------  ----------------  -----------
+45.4444       4.925e-05               4  ADAM            3.26758e-05        0.9   WarmupMultiStepLR                0.2  False                    0.99
+42.4404       0.00018893              2  ADAM            8.61609e-09        0.95  WarmupMultiStepLR                0.2  True                     0.99
+42.2611       1.74606e-05             2  ADAM            1.16105e-05        0     WarmupMultiStepLR                0    True                     0
+42.0539       0.000107611             8  ADAM            1.79504e-09        0.99  WarmupMultiStepLR                0.1  False                    0.1
+41.9136       5.25361e-05             2  ADAM            1.72767e-07        0.99  WarmupCosineLR                   0.2  False                    0
+41.8785       0.000286816             2  SGD             1.19338e-07        0.99  WarmupMultiStepLR                0.1  False                    0.9
+41.1564       9.31932e-05             2  ADAM            1.17301e-09        0.9   WarmupMultiStepLR                0.1  True                     0
+41.0661       3.18662e-05             2  ADAM            2.34281e-08        0.99  WarmupMultiStepLR                0    False                    0
+39.3311       1.58885e-05             2  ADAM            8.01104e-09        0.95  WarmupMultiStepLR                0.2  True                     0.9
+39.3258       1.67384e-05             8  ADAM            2.66187e-05        0     WarmupMultiStepLR                0    False                    0
+39.0861       0.000122106             2  ADAM            1.66605e-09        0.99  WarmupMultiStepLR                0.2  False                    0.9
+38.8237       3.78651e-05             4  ADAM            1.09702e-05        0.9   WarmupCosineLR                   0.1  False                    0.99
+38.2017       0.000286083             2  SGD             7.9831e-07         0.95  WarmupCosineLR                   0.2  False                    0.1
+37.0004       1.59702e-05             2  ADAM            1.83059e-10        0.95  WarmupMultiStepLR                0.2  True                     0
+36.7239       0.000101445             4  ADAM            1.44761e-05        0.99  WarmupMultiStepLR                0.1  True                     0.1
+36.4215       0.000124969             4  ADAM            0.000297016        0.9   WarmupMultiStepLR                0    False                    0.99
+35.0634       7.81416e-05             4  SGD             2.09212e-07        0.99  WarmupCosineLR                   0    False                    0
+32.7209       0.000308701             4  ADAM            8.31087e-07        0.99  WarmupCosineLR                   0.2  False                    0
+32.1562       0.000461665             4  SGD             0.000290648        0.9   WarmupMultiStepLR                0    False                    0.9
+30.4118       0.000233193             4  ADAM            2.32092e-07        0.9   WarmupMultiStepLR                0    False                    0
+30.4005       1.01869e-05             8  ADAM            3.03709e-08        0.99  WarmupMultiStepLR                0.1  True                     0.9
+30.0356       5.18214e-05             2  SGD             1.98044e-10        0.9   WarmupMultiStepLR                0    False                    0.99
+29.9443       0.000110647             2  ADAM            0.000374754        0.95  WarmupCosineLR                   0.1  False                    0.1
+29.4267       1.279e-05               4  ADAM            2.40339e-10        0     WarmupMultiStepLR                0.1  True                     0.9
+29.1358       2.00217e-05             4  ADAM            2.41694e-06        0     WarmupCosineLR                   0    True                     0.99
+28.9278       5.51032e-05             2  SGD             2.59898e-06        0.9   WarmupCosineLR                   0.2  False                    0
+27.2923       1.25456e-05             4  SGD             1.9909e-05         0.99  WarmupMultiStepLR                0    False                    0.9
+27.2509       1.22961e-05             8  ADAM            2.38683e-09        0.95  WarmupMultiStepLR                0.1  False                    0.9
+27.1691       0.000222722             8  ADAM            5.29012e-07        0.9   WarmupMultiStepLR                0.2  True                     0.1
+26.7044       1.38205e-05             8  ADAM            8.39372e-06        0.9   WarmupCosineLR                   0.2  False                    0.99
+25.9286       8.44888e-05             8  ADAM            1.39439e-07        0.99  WarmupMultiStepLR                0.2  False                    0
+25.198        1.08956e-05             2  SGD             6.4671e-05         0.99  WarmupCosineLR                   0    False                    0
+20.5911       4.52048e-05             4  SGD             2.72824e-08        0.95  WarmupCosineLR                   0    False                    0.1
+19.6199       9.90983e-05             4  ADAM            0.000642097        0.95  WarmupMultiStepLR                0.2  True                     0.99
+18.4168       6.92224e-05             4  SGD             2.05293e-10        0.95  WarmupCosineLR                   0.1  False                    0.99
+18.1889       3.69874e-05             4  SGD             0.000109849        0.9   WarmupMultiStepLR                0    False                    0.1
+17.7828       0.000314975             2  ADAM            2.40808e-10        0.99  WarmupMultiStepLR                0.2  True                     0.1
+12.8886       6.10468e-05             8  SGD             0.000110976        0.9   WarmupMultiStepLR                0.1  False                    0.1
+ 1.65695      0.000107763             2  SGD             5.1073e-07         0     WarmupMultiStepLR                0    True                     0.1
+ 0            2.76347e-05             8  SGD             1.5429e-08         0     WarmupMultiStepLR                0.1  False                    0.9
+ 0            1.71503e-05             2  SGD             1.30161e-09        0     WarmupMultiStepLR                0    False                    0.9
+ 0            1.155e-05               8  SGD             3.46116e-05        0.99  WarmupMultiStepLR                0.2  True                     0.99
+ 0            1.69344e-05             2  SGD             6.18992e-08        0     WarmupCosineLR                   0.2  True                     0
+ 0            0.000153363             2  SGD             7.08727e-08        0.99  WarmupCosineLR                   0.2  True                     0.9
+ 0            2.24206e-05             8  SGD             0.000935443        0.95  WarmupCosineLR                   0    True                     0.1
+ 0            1.41607e-05             4  SGD             9.08819e-09        0     WarmupMultiStepLR                0.1  True                     0.9
+ 0            8.62619e-05             8  SGD             1.5441e-09         0.95  WarmupCosineLR                   0.2  True                     0.99
+ 0            1.74358e-05             2  SGD             0.000922939        0     WarmupMultiStepLR                0.2  True                     0
+ 0            0.000178316             2  SGD             0.000325052        0.99  WarmupMultiStepLR                0.2  True                     0.9
+ 0            3.34331e-05             4  SGD             1.42461e-10        0.99  WarmupCosineLR                   0.1  True                     0.1
+"""
 
 """seed 456
      AP    photometric    gaussian_blur      cutout    cutout_sizes    sharpen

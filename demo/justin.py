@@ -347,7 +347,7 @@ class Trainer(DefaultTrainer):
             optimizer = torch.optim.Adam(params, cfg.SOLVER.BASE_LR)
             optimizer = maybe_add_gradient_clipping(cfg, optimizer)
             return optimizer
-        elif cfg.OPTIMIZER in ["SGD", "sgd"]:
+        elif cfg.OPTIMIZER.lower() == "sgd":
             return build_optimizer(cfg, model)
         else:
             raise ValueError
@@ -640,7 +640,7 @@ def set_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
 
 
-def build_config(train_datasets, base_config, output_dir, epochs=2.):
+def build_config(train_datasets, base_config, output_dir, batch_size=4, epochs=2.):
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file(base_config))
 
@@ -656,7 +656,7 @@ def build_config(train_datasets, base_config, output_dir, epochs=2.):
     cfg.INPUT.CROP.ENABLED = False
     cfg.INPUT.CROP.SIZE = [.9, .9]
 
-    cfg.SOLVER.IMS_PER_BATCH = 4
+    cfg.SOLVER.IMS_PER_BATCH = batch_size
 
     cfg.NUM_BATCHES = 0
     for ds in cfg.DATASETS.TRAIN:
@@ -664,30 +664,29 @@ def build_config(train_datasets, base_config, output_dir, epochs=2.):
     cfg.NUM_BATCHES = cfg.NUM_BATCHES // cfg.SOLVER.IMS_PER_BATCH
     cfg.EPOCHS = epochs
 
-    cfg.SOLVER.BASE_LR = .0001
+    cfg.SOLVER.BASE_LR = 4.925e-05
     cfg.SOLVER.MAX_ITER = int(cfg.EPOCHS * cfg.NUM_BATCHES)
     cfg.SOLVER.CHECKPOINT_PERIOD = cfg.NUM_BATCHES  # Checkpoint every epoch
-    cfg.SOLVER.WEIGHT_DECAY = 0.  # 0.00001
+    cfg.SOLVER.WEIGHT_DECAY = 3.26758e-05
     cfg.SOLVER.MOMENTUM = .9
     cfg.SOLVER.NESTEROV = False
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"
-    # Linear warm up to base learning rate within one 10th of all iterations
-    cfg.SOLVER.WARMUP_ITERS = 1.  # int(round(cfg.SOLVER.MAX_ITER * 0.1))
-    cfg.SOLVER.WARMUP_FACTOR = 1. / cfg.SOLVER.WARMUP_ITERS
+    # Linear warm up to base learning rate within 20% of all iterations
+    cfg.SOLVER.WARMUP_ITERS = int(cfg.SOLVER.MAX_ITER * .2)
+    cfg.SOLVER.WARMUP_FACTOR = 1. / float(cfg.SOLVER.WARMUP_ITERS)
     cfg.SOLVER.WARMUP_METHOD = "linear"
-    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False
+    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = True
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE = "norm"
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = .001
     cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.
-    # Reduce learning rate by a factor of 10 every 2 epochs
-    cfg.SOLVER.STEPS = (1,)  # [fraction * cfg.SOLVER.MAX_ITER for fraction in [0.75]]
-    cfg.SOLVER.GAMMA = 1.
+    cfg.SOLVER.GAMMA = .99
+    cfg.SOLVER.STEPS = [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
 
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_config)
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05
-    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
-    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.05
-    cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = .05
+    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = .5
+    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = .05
+    cfg.MODEL.RETINANET.NMS_THRESH_TEST = .5
 
     cfg.TEST.EVAL_PERIOD = 100
     cfg.TEST.DETECTIONS_PER_IMAGE = 100
@@ -865,7 +864,7 @@ def load_and_apply_cfg_values(cfg, output_dir, results_name="skopt_results.pkl")
     augmentation_values = dict()
     for k, v in zip(get_param_names(get_space()), res.x):
         augmentation_values[k] = v
-    set_cfg_values(cfg, augmentation_values=augmentation_values)
+    set_cfg_values(cfg, values=augmentation_values)
 
 
 def get_results_dict():
@@ -921,6 +920,8 @@ def main(seed=42):
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default='all', type=str,
                         help="List of datasets used for training.")
+    parser.add_argument("--batch_size", default=4, type=int, help="Batch size used during training.")
+    parser.add_argument("--epochs", default=2., type=float, help="(Fraction of) epochs to train.")
     parser.add_argument("--visualize", default=False, type=bool, help="Visualize training data.")
     args = parser.parse_args()
 
@@ -951,7 +952,7 @@ def main(seed=42):
         train_datasets = args.data
     else:
         raise AttributeError
-    cfg = build_config(train_datasets=train_datasets, base_config=base_config, output_dir=output_dir, epochs=2.)
+    cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs)
     # load_and_apply_cfg_values(cfg, output_dir)
 
     if args.visualize:
