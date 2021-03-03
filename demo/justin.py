@@ -664,23 +664,23 @@ def build_config(train_datasets, base_config, output_dir, batch_size=4, epochs=2
     cfg.NUM_BATCHES = cfg.NUM_BATCHES // cfg.SOLVER.IMS_PER_BATCH
     cfg.EPOCHS = epochs
 
-    cfg.SOLVER.BASE_LR = 4.925e-05
+    cfg.SOLVER.BASE_LR = 0.0001  # 4.925e-05
     cfg.SOLVER.MAX_ITER = int(cfg.EPOCHS * cfg.NUM_BATCHES)
     cfg.SOLVER.CHECKPOINT_PERIOD = cfg.NUM_BATCHES  # Checkpoint every epoch
-    cfg.SOLVER.WEIGHT_DECAY = 3.26758e-05
+    cfg.SOLVER.WEIGHT_DECAY = 0.  # 3.26758e-05
     cfg.SOLVER.MOMENTUM = .9
     cfg.SOLVER.NESTEROV = False
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"
     # Linear warm up to base learning rate within 20% of all iterations
-    cfg.SOLVER.WARMUP_ITERS = int(cfg.SOLVER.MAX_ITER * .2)
+    cfg.SOLVER.WARMUP_ITERS = 1  # int(cfg.SOLVER.MAX_ITER * .2)
     cfg.SOLVER.WARMUP_FACTOR = 1. / float(cfg.SOLVER.WARMUP_ITERS)
     cfg.SOLVER.WARMUP_METHOD = "linear"
-    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = True
+    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE = "norm"
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = .001
     cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.
-    cfg.SOLVER.GAMMA = .99
-    cfg.SOLVER.STEPS = [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
+    cfg.SOLVER.GAMMA = 1.  # .99
+    cfg.SOLVER.STEPS = (1,)  # [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
 
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_config)
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = .05
@@ -780,11 +780,10 @@ def load_datasets(train_root, eval_root):
     load_data(eval_root, splits=['val', 'test', 'train'])
 
     names = list()
-    top = os.path.join(train_root, "case")
-    for dirpath, dirnames, filenames in os.walk(top):
+    for dirpath, dirnames, filenames in os.walk(train_root):
         for name in dirnames:
             names.append(name)
-            register_coco_instances(name, {}, os.path.join(top, name, "coco_annotations.json"), os.path.join(top, name))
+            register_coco_instances(name, {}, os.path.join(train_root, name, "coco_annotations.json"), os.path.join(train_root, name))
         break
     return names
 
@@ -870,6 +869,7 @@ def load_and_apply_cfg_values(cfg, output_dir, results_name="skopt_results.pkl")
 def get_results_dict():
     res_dict = {"case_color": [40.20318213, 35.35496166, 31.02521989, 29.54828771, 27.14293436,
                                27.09203161, 26.40146892, 23.90050957, 23.23194967, 22.82641386],  # checked
+                "case_no_alpha": [48.87262553, 47.59580096, 44.83208555, 40.46059594, 40.40870896],
                 "case_new_cam_tless": [45.47795505, 44.66041727, 40.51798259, 36.96881034, 29.26575374],
                 "case_new_cam": [44.75878892, 42.88613014, 39.33238446, 32.79025745, 32.22301464],
                 "case_new_cam_a": [40.63473765, 33.00102775, 31.36526296, 30.9117473, 30.7852782],
@@ -925,7 +925,7 @@ def main(seed=42):
     parser.add_argument("--visualize", default=False, type=bool, help="Visualize training data.")
     args = parser.parse_args()
 
-    train_root = "/home/matthias/Data/Ubuntu/data/datasets"
+    train_root = "/home/matthias/Data/Ubuntu/data/datasets/case"
     eval_root = "/home/matthias/Data/Ubuntu/data/datasets/justin"
     dataset_names = load_datasets(train_root, eval_root)
 
