@@ -27,7 +27,7 @@ def main(seed):
 
     if args.base_config == "retinanet":
         base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-    elif args.base_conifg == "mask_rcnn":
+    elif args.base_config == "mask_rcnn":
         base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
     else:
         base_config = args.base_config
