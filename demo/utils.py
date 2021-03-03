@@ -49,7 +49,7 @@ def get_space():
              skopt.space.Categorical([True, True], name="clip_gradients"),
              skopt.space.Categorical([.0001, .0005, .001, .005, .01, .1, .5, 1.], name="clip_value"),
              skopt.space.Categorical(["norm", "value"], name="clip_type"),
-             skopt.space.Categorical([1., 2., np.inf], name="clip_norm"),
+             skopt.space.Categorical([1., 2., np.inf], name="norm_type"),
              skopt.space.Categorical([0., .1, .9, .99], name="reduce_lr")]
              # skopt.space.Categorical([True, False], name="change_num_classes"),
              #skopt.space.Categorical([#"COCO-Detection/retinanet_R_50_FPN_1x.yaml",

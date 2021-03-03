@@ -3,6 +3,7 @@ import os
 import skopt
 import tabulate
 import numpy as np
+import argparse
 
 from utils import get_space, get_param_names, set_cfg_values
 from justin import set_seed, setup_logger, load_datasets, get_results_dict, build_config, train_eval
@@ -10,21 +11,53 @@ from justin import set_seed, setup_logger, load_datasets, get_results_dict, buil
 
 def main(seed):
     set_seed(seed)
-    setup_logger(name="case")
 
-    train_root = "/home/matthias/Data/Ubuntu/data/datasets"
-    eval_root = "/home/matthias/Data/Ubuntu/data/datasets/justin"
-    load_datasets(train_root, eval_root)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", default='all', type=str, help="List of datasets used for training.")
+    parser.add_argument("--path_prefix", default="/home/matthias/Data/Ubuntu/data", type=str)
+    parser.add_argument("--train_dir", default="datasets/case", type=str)
+    parser.add_argument("--val_dir", default="datasets/justin", type=str)
+    parser.add_argument("--out_dir", default="justin_training", type=str)
+    parser.add_argument("--base_config", default="retinanet", type=str)
+    args = parser.parse_args()
 
-    base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"  # "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
-    output_dir = "/home/matthias/Data/Ubuntu/data/justin_training"
+    train_root = os.path.join(args.path_prefix, args.train_dir)
+    val_root = os.path.join(args.path_prefix, args.val_dir)
+    dataset_names = load_datasets(train_root, val_root)
 
+    if args.base_config == "retinanet":
+        base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
+    elif args.base_conifg == "mask_rcnn":
+        base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
+    else:
+        base_config = args.base_config
+    output_dir = os.path.join(args.path_prefix, args.out_dir)
+
+    if isinstance(args.data, str):
+        assert (args.data in dataset_names or args.data in ['all', 'best'])
+        train_datasets = list()
+        if args.data == 'all':
+            train_datasets = dataset_names
+        elif args.data == 'best':
+            best_datasets = list()
+            for k, v in get_results_dict().items():
+                best_datasets.append([np.mean(v), np.max(v)])
+            best_mean = np.quantile(np.array(best_datasets)[:, 0], q=.9)
+            best_max = np.quantile(np.array(best_datasets)[:, 1], q=.9)
+            for k, v in get_results_dict().items():
+                if np.mean(v) >= best_mean or np.max(v) >= best_max:
+                    train_datasets.append(k)
+        else:
+            train_datasets.append(args.data)
+    elif isinstance(args.data, (list, tuple)):
+        train_datasets = args.data
+    else:
+        raise AttributeError
     space = get_space()
 
     @skopt.utils.use_named_args(dimensions=space)
     def objective(**params):
-        cfg = build_config(("case_new_cam_tless", "case_new_cam_tless_a"), base_config, output_dir,
-                           batch_size=params["batch_size"], epochs=1.)
+        cfg = build_config(train_datasets, base_config, output_dir, batch_size=params["batch_size"])
         set_cfg_values(cfg, params)
         print(tabulate.tabulate(np.expand_dims(list(params.values()), axis=0), headers=list(params.keys())))
         try:
