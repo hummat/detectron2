@@ -19,6 +19,7 @@ def main(seed):
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
     parser.add_argument("--base_config", default="retinanet", type=str)
+    parser.add_argument("--evals", default=50, type=int, help="Number of hyperparameter search evaluations.")
     args = parser.parse_args()
 
     train_root = os.path.join(args.path_prefix, args.train_dir)
@@ -74,7 +75,7 @@ def main(seed):
         print("AP:", ap)
         return 100. if np.isnan(ap) else 100. - ap
 
-    res = skopt.dummy_minimize(func=objective, dimensions=space, n_calls=50, random_state=seed, verbose=True)
+    res = skopt.dummy_minimize(func=objective, dimensions=space, n_calls=args.evals, random_state=seed, verbose=True)
     res_sorted = np.concatenate([np.expand_dims(100. - res.func_vals, axis=1), res.x_iters], axis=1)
     print()
     print(tabulate.tabulate(res_sorted[res_sorted[:, 0].argsort()[::-1]], headers=["AP"] + get_param_names(space)))
@@ -91,7 +92,7 @@ def main(seed):
 
 
 if __name__ == "__main__":
-    main(seed=13)
+    main(seed=564568)
 
 """seed 13
       AP    learning_rate    batch_size  optimizer      weight_decay    momentum  lr_scheduler         warmup_fraction  clip_gradients      reduce_lr
