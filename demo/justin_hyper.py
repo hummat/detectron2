@@ -6,11 +6,11 @@ import numpy as np
 import argparse
 
 from utils import get_space, get_param_names, set_cfg_values
-from justin import set_seed, setup_logger, load_datasets, get_results_dict, build_config, train_eval
+from justin import set_all_seeds, setup_logger, load_datasets, get_results_dict, build_config, train_eval
 
 
 def main(seed):
-    set_seed(seed)
+    set_all_seeds(seed)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default='all', type=str, help="List of datasets used for training.")
@@ -18,7 +18,7 @@ def main(seed):
     parser.add_argument("--train_dir", default="datasets/case", type=str)
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
-    parser.add_argument("--base_config", default="retinanet", type=str)
+    parser.add_argument("--model", default="retinanet", type=str)
     parser.add_argument("--calls", default=50, type=int, help="Number of hyperparameter search evaluations.")
     args = parser.parse_args()
 
@@ -26,12 +26,12 @@ def main(seed):
     val_root = os.path.join(args.path_prefix, args.val_dir)
     dataset_names = load_datasets(train_root, val_root)
 
-    if args.base_config == "retinanet":
+    if args.model == "retinanet":
         base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-    elif args.base_config == "mask_rcnn":
+    elif args.model == "mask_rcnn":
         base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
     else:
-        base_config = args.base_config
+        base_config = args.model
     output_dir = os.path.join(args.path_prefix, args.out_dir)
 
     if isinstance(args.data, str):
@@ -75,7 +75,7 @@ def main(seed):
         print("AP:", ap)
         return 100. if np.isnan(ap) else 100. - ap
 
-    res = skopt.dummy_minimize(func=objective, dimensions=space, n_calls=args.calls, random_state=seed, verbose=True)
+    res = skopt.gp_minimize(func=objective, dimensions=space, n_calls=args.calls, random_state=seed, verbose=True)
     res_sorted = np.concatenate([np.expand_dims(100. - res.func_vals, axis=1), res.x_iters], axis=1)
     print()
     print(tabulate.tabulate(res_sorted[res_sorted[:, 0].argsort()[::-1]], headers=["AP"] + get_param_names(space)))

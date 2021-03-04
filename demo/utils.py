@@ -66,6 +66,12 @@ def get_param_names(**params):
 
 
 def set_cfg_values(cfg, values):
+    for k, v in values.items():
+        try:
+            values[k] = v.item()
+        except AttributeError:
+            pass
+
     if "optimizer" in values:
         cfg.OPTIMIZER = values["optimizer"]
     if "momentum" in values:

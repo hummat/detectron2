@@ -47,6 +47,7 @@ from detectron2.utils.logger import setup_logger
 
 from utils import get_space, get_param_names, set_cfg_values
 
+
 # from .eval_loss_hook import LossEvalHook
 
 
@@ -86,7 +87,8 @@ class Mosaic(Augmentation):
     def get_transform(self, image):
         img = image.copy().astype(float)[:, :, ::-1] / 255.
         cfa = mosaicing_CFA_Bayer(img, self.pattern)
-        img = np.clip(as_float_array(cctf_encoding(demosaicing_CFA_Bayer_bilinear(cfa, self.pattern))), 0, 1)[:, :, ::-1]
+        img = np.clip(as_float_array(cctf_encoding(demosaicing_CFA_Bayer_bilinear(cfa, self.pattern))), 0, 1)[:, :,
+              ::-1]
         return ReturnTransform(image=(img * 255.).astype(np.uint8))
 
 
@@ -629,7 +631,8 @@ def visualize_data(cfg, data_loader):
             cv2.waitKey()
 
 
-def set_seed(seed):
+def set_all_seeds(seed: int):
+    seed = int(seed)
     imgaug_seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -640,7 +643,7 @@ def set_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
 
 
-def build_config(train_datasets, base_config, output_dir, batch_size=4, epochs=2.):
+def build_config(train_datasets, base_config, output_dir, batch_size: int = 4, epochs=2.):
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file(base_config))
 
@@ -656,7 +659,7 @@ def build_config(train_datasets, base_config, output_dir, batch_size=4, epochs=2
     cfg.INPUT.CROP.ENABLED = False
     cfg.INPUT.CROP.SIZE = [.9, .9]
 
-    cfg.SOLVER.IMS_PER_BATCH = batch_size
+    cfg.SOLVER.IMS_PER_BATCH = int(batch_size)
 
     cfg.NUM_BATCHES = 0
     for ds in cfg.DATASETS.TRAIN:
@@ -680,7 +683,8 @@ def build_config(train_datasets, base_config, output_dir, batch_size=4, epochs=2
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = .001
     cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.
     cfg.SOLVER.GAMMA = 1.  # .99
-    cfg.SOLVER.STEPS = (1,)  # [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
+    cfg.SOLVER.STEPS = (
+    1,)  # [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
 
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_config)
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = .05
@@ -783,7 +787,8 @@ def load_datasets(train_root, eval_root):
     for dirpath, dirnames, filenames in os.walk(train_root):
         for name in dirnames:
             names.append(name)
-            register_coco_instances(name, {}, os.path.join(train_root, name, "coco_annotations.json"), os.path.join(train_root, name))
+            register_coco_instances(name, {}, os.path.join(train_root, name, "coco_annotations.json"),
+                                    os.path.join(train_root, name))
         break
     return names
 
@@ -889,7 +894,8 @@ def get_results_dict():
                 "case_texture": [30.93216935, 30.5514081, 28.04813986, 24.42527646, 19.33343886],  # checked
                 "case_more_bounces": [33.83921761, 29.46399028, 27.03319279, 26.84496801, 25.03445091],  # checked
                 "case_area_light": [28.64929296, 26.14490815, 21.8578116, 19.71479663, 17.28886026],  # checked
-                "case_cam_uniform3d_inplane": [31.96673795, 31.26197291, 30.49044743, 24.15643791, 23.57493626],  # checked
+                "case_cam_uniform3d_inplane": [31.96673795, 31.26197291, 30.49044743, 24.15643791, 23.57493626],
+                # checked
                 "case_cam_uniform3d": [26.97584852, 26.62969497, 26.14628782, 21.09606741, 20.16900372],  # checked
                 "case_cam_poi": [10.86430437, 7.79265517, 7.42004987, 6.64692292, 6.02255621],  # checked
                 "case_white_light": [31.87034131, 29.22695543, 26.59384891, 23.18313712, 20.93746476],  # checked
@@ -900,7 +906,8 @@ def get_results_dict():
                 "case_point_lights_only": [27.49361244, 25.31737831, 21.3253789, 14.1208087, 11.48722047],  # checked
                 "case_less_light": [26.20951466, 23.10560782, 21.613864, 20.07971469, 4.9723414],  # checked
                 "case_two_lights": [26.07114511, 19.92342411, 11.68455528, 9.60110245, 3.3309312],  # checked
-                "case_even_less_cam_rotation": [41.14436033, 37.58032475, 35.9072579, 34.13007927, 30.49871135],  # checked
+                "case_even_less_cam_rotation": [41.14436033, 37.58032475, 35.9072579, 34.13007927, 30.49871135],
+                # checked
                 "case_fov": [36.76167819, 35.08760321, 31.27037743, 30.37089514, 26.70382605],  # checked
                 "case_less_cam_rotation": [25.7747, 18.8846, 18.2181, 17.4002, 10.1219],  # checked
                 "case_train_green": [36.01153481, 34.57256129, 31.54693327, 30.22182292, 22.28776532],  # checked
@@ -913,9 +920,9 @@ def get_results_dict():
     return res_dict
 
 
-def main(seed=42):
+def main(seed: int = 42):
     start = time.time()
-    set_seed(seed)
+    set_all_seeds(seed)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default='all', type=str, help="List of datasets used for training.")
@@ -926,7 +933,16 @@ def main(seed=42):
     parser.add_argument("--model", default="retinanet", type=str)
     parser.add_argument("--batch_size", default=4, type=int, help="Batch size used during training.")
     parser.add_argument("--learning_rate", default=0.0001, type=float, help="Learning rate used during training.")
-    parser.add_argument("--epochs", default=2., type=float, help="(Fraction of) epochs to train.")
+    parser.add_argument("--reduce_lr", default=0., type=float, help="Multiplied by learning rate each iteration.")
+    parser.add_argument("--weight_decay", default=0., type=float, help="Weight decay used during training.")
+    parser.add_argument("--warmup_fraction", default=0., type=float,
+                        help="Learning rate warmup in fraction of total steps.")
+    parser.add_argument("--clip_gradients", action="store_true", help="Gradients are clipped at 'clip_value'.")
+    parser.add_argument("--clip_value", default=0.001, type=float, help="Threshold for gradient clipping.")
+    parser.add_argument("--clip_type", default="value", type=str,
+                        help="Gradients can be clipped at 'clip_value' value or their norm")
+    parser.add_argument("--norm_type", default=2.0, type=float, help="Norm type for 'norm' gradient clipping.")
+    parser.add_argument("--epochs", default=2.0, type=float, help="(Fraction of) epochs to train.")
     parser.add_argument("--visualize", default=False, type=bool, help="Visualize training data.")
     args = parser.parse_args()
 
@@ -941,6 +957,7 @@ def main(seed=42):
     else:
         base_config = args.model
     output_dir = os.path.join(args.path_prefix, args.out_dir)
+    logger = setup_logger(output=os.path.join(output_dir, f"{args.data}.log"), name=__file__)
 
     if isinstance(args.data, str):
         assert (args.data in dataset_names or args.data in ['all', 'best'])
@@ -963,7 +980,16 @@ def main(seed=42):
     else:
         raise AttributeError
     cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs)
-    set_cfg_values(cfg, values={"learning_rate": args.learning_rate})
+    values = {"learning_rate": args.learning_rate,
+              "reduce_lr": args.reduce_lr,
+              "weight_decay": args.weight_decay,
+              "warmup_fraction": args.warmup_fraction,
+              "clip_gradients": args.clip_gradients,
+              "clip_value": args.clip_value,
+              "clip_type": args.clip_type,
+              "norm_type": args.norm_type}
+    logger.info(values)
+    set_cfg_values(cfg, values)
     # load_and_apply_cfg_values(cfg, output_dir)
 
     if args.visualize:
@@ -974,7 +1000,7 @@ def main(seed=42):
 
     results = list()
     for s in np.arange(5):
-        set_seed(s)
+        set_all_seeds(s)
         ap, it = train_eval(cfg)
         result = np.vstack([ap, it]).T
         result = result[result[:, 0].argmax()].tolist()
@@ -985,7 +1011,6 @@ def main(seed=42):
     ap = results[:, 0]
     table = tabulate.tabulate(results[ap.argsort()[::-1]], headers=["AP", "iter", "seed"])
 
-    logger = setup_logger(output=os.path.join(output_dir, f"{args.data}.log"), name=__file__)
     logger.info(table)
     logger.info(f"Mean AP: {ap.mean()}")
     logger.info(f"95% conf. interv.: {t.interval(0.95, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
@@ -1003,4 +1028,4 @@ def main(seed=42):
 
 
 if __name__ == "__main__":
-    main()
+    main(seed=564568)
