@@ -923,8 +923,9 @@ def main(seed=42):
     parser.add_argument("--train_dir", default="datasets/case", type=str)
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
-    parser.add_argument("--base_config", default="retinanet", type=str)
+    parser.add_argument("--model", default="retinanet", type=str)
     parser.add_argument("--batch_size", default=4, type=int, help="Batch size used during training.")
+    parser.add_argument("--learning_rate", default=0.0001, type=float, help="Learning rate used during training.")
     parser.add_argument("--epochs", default=2., type=float, help="(Fraction of) epochs to train.")
     parser.add_argument("--visualize", default=False, type=bool, help="Visualize training data.")
     args = parser.parse_args()
@@ -933,12 +934,12 @@ def main(seed=42):
     val_root = os.path.join(args.path_prefix, args.val_dir)
     dataset_names = load_datasets(train_root, val_root)
 
-    if args.base_config == "retinanet":
+    if args.model == "retinanet":
         base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-    elif args.base_conifg == "mask_rcnn":
+    elif args.model == "mask_rcnn":
         base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
     else:
-        base_config = args.base_config
+        base_config = args.model
     output_dir = os.path.join(args.path_prefix, args.out_dir)
 
     if isinstance(args.data, str):
@@ -962,6 +963,7 @@ def main(seed=42):
     else:
         raise AttributeError
     cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs)
+    set_cfg_values(cfg, values={"learning_rate": args.learning_rate})
     # load_and_apply_cfg_values(cfg, output_dir)
 
     if args.visualize:

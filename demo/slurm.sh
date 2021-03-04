@@ -19,7 +19,7 @@ nvidia-smi
 start_time=$(date +%s)
 echo "Job Started at $(date)"
 
-python /net/rmc-lx0114/home_local/git/detectron2/demo/justin_hyper.py --data case_no_alpha --path_prefix /net/rmc-gpu03/home_local/humt_ma --out_dir data/justin_training --base_config mask_rcnn --evals 100
+python /net/rmc-lx0114/home_local/git/detectron2/demo/justin_hyper.py --data case_no_alpha --path_prefix /net/rmc-gpu03/home_local/humt_ma --out_dir data/justin_training --base_config mask_rcnn --calls 100
 
 echo "Job ended at $(date)"
 end_time=$(date +%s)
