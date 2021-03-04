@@ -962,12 +962,13 @@ def main(seed: int = 42):
     output_dir = os.path.join(args.path_prefix, args.out_dir)
     logger = setup_logger(output=os.path.join(output_dir, f"{args.data}.log"), name=__file__)
 
-    if isinstance(args.data, str):
-        assert (args.data in dataset_names or args.data in ['all', 'best'])
+    if len(args.data) == 1:
+        data = args.data[0]
+        assert (data in dataset_names or data in ['all', 'best'])
         train_datasets = list()
-        if args.data == 'all':
+        if data == 'all':
             train_datasets = dataset_names
-        elif args.data == 'best':
+        elif data == 'best':
             best_datasets = list()
             for k, v in get_results_dict().items():
                 best_datasets.append([np.mean(v), np.max(v)])
@@ -977,11 +978,12 @@ def main(seed: int = 42):
                 if np.mean(v) >= best_mean or np.max(v) >= best_max:
                     train_datasets.append(k)
         else:
-            train_datasets.append(args.data)
+            train_datasets.append(data)
     elif isinstance(args.data, (list, tuple)):
         train_datasets = args.data
     else:
         raise AttributeError
+
     cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs)
     values = {"learning_rate": args.learning_rate,
               "reduce_lr": args.reduce_lr,

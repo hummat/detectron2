@@ -1,11 +1,10 @@
 import skopt
-from PIL import Image
 import numpy as np
 
 
 def get_space():
     space = [skopt.space.Real(1e-6, 1e-3, name="learning_rate", prior='log-uniform'),
-             skopt.space.Categorical([2, 4, 8], name="batch_size"),
+             skopt.space.Categorical([2, 4], name="batch_size"),
              # skopt.space.Categorical([.1, .2, .5, 1.], name="epochs"),
              # skopt.space.Categorical([True, False], name="rotate"),
              # skopt.space.Categorical([0., .05, .1, .2, .5, .7, 1.], name="photometric"),
@@ -47,7 +46,7 @@ def get_space():
              # skopt.space.Categorical([.5, .6, .7, .8, .9, 1.], name="random_crop"),
              # skopt.space.Categorical([(480,), (640,), (800,), (480, 800), (640, 672, 704, 736, 768, 800)], name="scales"),
              skopt.space.Categorical([True, True], name="clip_gradients"),
-             skopt.space.Categorical([.0001, .0005, .001, .005, .01, .1, .5, 1.], name="clip_value"),
+             skopt.space.Categorical([1e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, .1, .5, 1.], name="clip_value"),
              skopt.space.Categorical(["norm", "value"], name="clip_type"),
              skopt.space.Categorical([1., 2., np.inf], name="norm_type"),
              skopt.space.Categorical([0., .1, .9, .99], name="reduce_lr")]
