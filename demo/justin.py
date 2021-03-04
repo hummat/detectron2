@@ -787,8 +787,10 @@ def load_datasets(train_root, eval_root):
     for dirpath, dirnames, filenames in os.walk(train_root):
         for name in dirnames:
             names.append(name)
-            register_coco_instances(name, {}, os.path.join(train_root, name, "coco_annotations.json"),
-                                    os.path.join(train_root, name))
+            path = os.path.join(train_root, name, "coco_data")
+            if not os.path.exists(path):
+                path = os.path.join(train_root, name)
+            register_coco_instances(name, {}, os.path.join(path, "coco_annotations.json"), path)
         break
     return names
 
@@ -874,6 +876,7 @@ def load_and_apply_cfg_values(cfg, output_dir, results_name="skopt_results.pkl")
 def get_results_dict():
     res_dict = {"case_color": [40.20318213, 35.35496166, 31.02521989, 29.54828771, 27.14293436,
                                27.09203161, 26.40146892, 23.90050957, 23.23194967, 22.82641386],  # checked
+                "case_hdr_only": [46.15308288, 44.93498767, 40.18497103, 38.49819022, 29.2418928],
                 "case_no_alpha": [48.87262553, 47.59580096, 44.83208555, 40.46059594, 40.40870896],
                 "case_new_cam_tless": [45.47795505, 44.66041727, 40.51798259, 36.96881034, 29.26575374],
                 "case_new_cam": [44.75878892, 42.88613014, 39.33238446, 32.79025745, 32.22301464],
@@ -925,7 +928,7 @@ def main(seed: int = 42):
     set_all_seeds(seed)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default='all', type=str, help="List of datasets used for training.")
+    parser.add_argument("-d", "--data", type=str, nargs='+', help="List of datasets used for training.")
     parser.add_argument("--path_prefix", default="/home/matthias/Data/Ubuntu/data", type=str)
     parser.add_argument("--train_dir", default="datasets/case", type=str)
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
@@ -1028,4 +1031,4 @@ def main(seed: int = 42):
 
 
 if __name__ == "__main__":
-    main(seed=564568)
+    main(seed=42)

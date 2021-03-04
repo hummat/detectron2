@@ -13,7 +13,7 @@ def main(seed):
     set_all_seeds(seed)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", default='all', type=str, help="List of datasets used for training.")
+    parser.add_argument("-d", "--data", type=str, nargs='+', help="List of datasets used for training.")
     parser.add_argument("--path_prefix", default="/home/matthias/Data/Ubuntu/data", type=str)
     parser.add_argument("--train_dir", default="datasets/case", type=str)
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
