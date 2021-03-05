@@ -10,6 +10,7 @@ def get_results_dict():
                 "case_hdr_only": [46.15308288, 44.93498767, 40.18497103, 38.49819022, 29.2418928],
                 "case_haven_hdr": [41.75135572, 34.1886493, 33.31176793, 29.1229799, 28.53087389],
                 "case_no_alpha": [48.87262553, 47.59580096, 44.83208555, 40.46059594, 40.40870896],
+                "case_new_cam_tless_a": [54.17362365, 48.28175825, 46.88282047, 42.33050659, 41.49927066],
                 "case_new_cam_tless": [45.47795505, 44.66041727, 40.51798259, 36.96881034, 29.26575374],
                 "case_new_cam": [44.75878892, 42.88613014, 39.33238446, 32.79025745, 32.22301464],
                 "case_new_cam_a": [40.63473765, 33.00102775, 31.36526296, 30.9117473, 30.7852782],
@@ -81,8 +82,8 @@ def parse_data(data: list, dataset_names: list):
 
 
 def get_space():
-    space = [skopt.space.Real(1e-6, 1e-3, name="learning_rate", prior='log-uniform'),
-             skopt.space.Categorical([2, 4], name="batch_size"),
+    space = [skopt.space.Real(1e-5, 1e-3, name="learning_rate", prior='log-uniform'),
+             # skopt.space.Categorical([2, 4], name="batch_size"),
              # skopt.space.Categorical([.1, .2, .5, 1.], name="epochs"),
              # skopt.space.Categorical([True, False], name="rotate"),
              # skopt.space.Categorical([0., .05, .1, .2, .5, .7, 1.], name="photometric"),
@@ -97,36 +98,36 @@ def get_space():
              # skopt.space.Categorical([0., .1, .5, 1.], name="grayscale"),
              # skopt.space.Categorical([0., .1, .5, 1.], name="invert"),
              # skopt.space.Categorical([0., .01, .1, .3, .5, 1.], name="hist"),
-             # skopt.space.Real(0., 1., name="photometric"),
+             skopt.space.Real(0., 1., name="photometric"),
              # skopt.space.Real(0., .1, name="noise"),
-             # skopt.space.Real(0., .5, name="cam_noise"),
-             # skopt.space.Real(0., .5, name="motion_blur"),
+             skopt.space.Real(0., .5, name="cam_noise"),
+             skopt.space.Real(0., .5, name="motion_blur"),
              # skopt.space.Real(0., 1., name="gaussian_blur"),
-             # skopt.space.Real(0., 1., name="cutout"),
-             # skopt.space.Categorical([10, 50, 100, 200], name="cutout_sizes"),
-             # skopt.space.Real(0., 1., name="sharpen")]
-             # skopt.space.Real(0., 1., name="clahe"),
-             # skopt.space.Real(0., 1., name="channel_dropout"),
-             # skopt.space.Real(0., 1., name="grayscale"),
-             # skopt.space.Real(0., 1., name="invert"),
-             # skopt.space.Real(0., 3., name="hist_fda"),
-             # skopt.space.Categorical([True, False], name="vignette"),
-             # skopt.space.Categorical([True, False], name="chromatic")]
+             skopt.space.Real(0., 1., name="cutout"),
+             skopt.space.Categorical([10, 50, 100, 200], name="cutout_sizes"),
+             skopt.space.Real(0., 1., name="sharpen"),
+             skopt.space.Real(0., 1., name="clahe"),
+             skopt.space.Real(0., 1., name="channel_dropout"),
+             skopt.space.Real(0., 1., name="grayscale"),
+             skopt.space.Real(0., 1., name="invert"),
+             skopt.space.Real(0., 3., name="hist_fda"),
+             skopt.space.Categorical([True, False], name="vignette"),
+             skopt.space.Categorical([True, False], name="chromatic"),
              # skopt.space.Categorical([True, False], name="denoise"),
              # skopt.space.Categorical([Image.BILINEAR, Image.NEAREST, Image.LANCZOS, Image.BICUBIC, Image.LINEAR,
              #                          Image.CUBIC], name="interp")]
              # skopt.space.Categorical(["SGD", "ADAM"], name="optimizer"),
-             skopt.space.Real(1e-15, 1e-2, name="weight_decay", prior='log-uniform'),
+             skopt.space.Real(1e-15, 1e-7, name="weight_decay", prior='log-uniform'),
              # skopt.space.Categorical([0.0, 0.9, 0.95, 0.99], name="momentum"),
              # skopt.space.Categorical([True, False], name="nesterov"),
-             skopt.space.Categorical(["WarmupCosineLR", "WarmupMultiStepLR"], name="lr_scheduler"),
-             skopt.space.Categorical([0., .1, .2, .3], name="warmup_fraction"),
-             # skopt.space.Categorical([.5, .6, .7, .8, .9, 1.], name="random_crop"),
-             # skopt.space.Categorical([(480,), (640,), (800,), (480, 800), (640, 672, 704, 736, 768, 800)], name="scales"),
-             skopt.space.Categorical([True, True], name="clip_gradients"),
-             skopt.space.Categorical([1e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2, .1, .5, 1.], name="clip_value"),
-             skopt.space.Categorical(["norm", "value"], name="clip_type"),
-             skopt.space.Categorical([1., 2., np.inf], name="norm_type"),
+             # skopt.space.Categorical(["WarmupCosineLR", "WarmupMultiStepLR"], name="lr_scheduler"),
+             skopt.space.Categorical([0., .1], name="warmup_fraction"),
+             skopt.space.Categorical([.7, .8, .9, 1.], name="random_crop"),
+             skopt.space.Categorical([(480,), (640,), (800,), (480, 800), (640, 672, 704, 736, 768, 800)], name="scales"),
+             skopt.space.Categorical([True, False], name="clip_gradients"),
+             # skopt.space.Categorical([1e-7, 1e-6, 1e-5, 1e-4, 1e-3], name="clip_value"),
+             # skopt.space.Categorical(["norm", "value"], name="clip_type")]
+             # skopt.space.Categorical([1., 2., np.inf], name="norm_type"),
              skopt.space.Categorical([0., .1, .9, .99], name="reduce_lr")]
              # skopt.space.Categorical([True, False], name="change_num_classes"),
              #skopt.space.Categorical([#"COCO-Detection/retinanet_R_50_FPN_1x.yaml",
@@ -179,9 +180,12 @@ def set_cfg_values(cfg, values):
     if "clip_gradients" in values:
         if values["clip_gradients"]:
             cfg.SOLVER.CLIP_GRADIENTS.ENABLED = True
-            cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE = values["clip_type"]
-            cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = values["clip_value"]
-            cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = values["norm_type"]
+            if "clip_type" in values:
+                cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE = values["clip_type"]
+            if "clip_value" in values:
+                cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = values["clip_value"]
+            if "norm_type" in values:
+                cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = values["norm_type"]
         else:
             cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False
 
@@ -199,7 +203,8 @@ def set_cfg_values(cfg, values):
     if "random_types" in values:
         cfg.RANDOM_TYPES = values["random_types"]
     if "photometric" in values:
-        cfg.PHOTOMETRIC = [0., values["photometric"]] if values["photometric"] else []
+        max_val = values["photometric"]
+        cfg.PHOTOMETRIC = [[0., max_val], [0., max_val], [0., max_val], [0., max_val]] if values["photometric"] else []
         if "photometric_types" in values:
             cfg.PHOTOMETRIC_TYPES = values["photometric_types"]
     if "noise" in values:

@@ -19,6 +19,7 @@ def main(seed):
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
     parser.add_argument("--model", default="retinanet", type=str)
+    parser.add_argument("--batch_size", default=4, type=int, help="Batch size used during training.")
     parser.add_argument("--epochs", default=2.0, type=float, help="(Fraction of) epochs to train.")
     parser.add_argument("--calls", default=50, type=int, help="Number of hyperparameter search evaluations.")
     args = parser.parse_args()
@@ -40,7 +41,7 @@ def main(seed):
 
     @skopt.utils.use_named_args(dimensions=space)
     def objective(**params):
-        cfg = build_config(train_datasets, base_config, output_dir, batch_size=params["batch_size"], epochs=args.epochs)
+        cfg = build_config(train_datasets, base_config, output_dir, batch_size=args.batch_size, epochs=args.epochs)
         set_cfg_values(cfg, params)
         print(tabulate.tabulate(np.expand_dims(list(params.values()), axis=0), headers=list(params.keys())))
         try:
@@ -57,7 +58,7 @@ def main(seed):
         print("AP:", ap)
         return 100. if np.isnan(ap) else 100. - ap
 
-    res = skopt.forest_minimize(func=objective, dimensions=space, n_calls=args.calls, random_state=seed, verbose=True)
+    res = skopt.dummy_minimize(func=objective, dimensions=space, n_calls=args.calls, random_state=seed, verbose=True)
     res_sorted = np.concatenate([np.expand_dims(100. - res.func_vals, axis=1), res.x_iters], axis=1)
     print()
     print(tabulate.tabulate(res_sorted[res_sorted[:, 0].argsort()[::-1]], headers=["AP"] + get_param_names(space)))
@@ -74,7 +75,17 @@ def main(seed):
 
 
 if __name__ == "__main__":
-    main(seed=564568)
+    main(seed=1234)
+
+"""
+      AP    learning_rate    batch_size    weight_decay  lr_scheduler         warmup_fraction  clip_gradients      clip_value  clip_type      norm_type    reduce_lr
+--------  ---------------  ------------  --------------  -----------------  -----------------  ----------------  ------------  -----------  -----------  -----------
+50.8236       0.000112884             4     2.4338e-11   WarmupMultiStepLR                0.1  True                    1e-05   norm                   2         0.9
+49.4218       0.000200714             2     3.37867e-08  WarmupMultiStepLR                0.2  True                    0.0005  norm                   1         0
+48.3921       0.000400831             2     8.42407e-08  WarmupCosineLR                   0.3  True                    0.001   value                inf         0
+45.5131       8.96462e-05             4     1.19641e-08  WarmupMultiStepLR                0    True                    0.005   norm                   2         0.99
+44.5976       0.000351911             4     1.25598e-15  WarmupMultiStepLR                0.3  True                    0.5     value                  1         0.1
+"""
 
 """seed 13
       AP    learning_rate    batch_size  optimizer      weight_decay    momentum  lr_scheduler         warmup_fraction  clip_gradients      reduce_lr

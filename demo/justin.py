@@ -172,7 +172,7 @@ class Photometric(Augmentation):
 
         if 'brightness' in types:
             offset = self._get_amount(self.types.index('brightness'))
-            composition.append(transforms.RandomBrightness(1. - offset, 1. + offset))
+            composition.append(transforms.RandomBrightness(1. - min(offset, 0.7), 1. + min(offset, 0.7)))
         if 'contrast' in types:
             offset = self._get_amount(self.types.index('contrast'))
             composition.append(transforms.RandomContrast(1. - offset, 1. + offset))
@@ -595,13 +595,13 @@ def visualize_results(predictor, dataset="", image_path=""):
         data_dicts = DatasetCatalog.get(dataset)
         metadata = MetadataCatalog.get('justin_test')
 
-        for d in random.sample(data_dicts, 10):
+        for d in data_dicts:
             img = cv2.imread(d["file_name"])
             outputs = predictor(img[:, :, ::-1])
             v = Visualizer(img[:, :, ::-1], metadata=metadata)
             out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
             cv2.imshow(str(d["image_id"]), out.get_image()[:, :, ::-1])
-        cv2.waitKey()
+            cv2.waitKey()
     elif image_path:
         img = cv2.imread(image_path)
         outputs = predictor(img[:, :, ::-1])
@@ -683,8 +683,7 @@ def build_config(train_datasets, base_config, output_dir, batch_size: int = 4, e
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = .001
     cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.
     cfg.SOLVER.GAMMA = 1.  # .99
-    cfg.SOLVER.STEPS = (
-    1,)  # [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
+    cfg.SOLVER.STEPS = (1,)  # [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
 
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_config)
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = .05
@@ -877,41 +876,82 @@ def main(seed: int = 42):
     start = time.time()
     set_all_seeds(seed)
 
+    default_values = {"learning_rate": 0.0001,
+                      "batch_size": 4,
+                      "epochs": 2.0,
+                      "reduce_lr": 0.,
+                      "weight_decay": 0,
+                      "warmup_fraction": 0.,
+                      "clip_gradients": False,
+                      "clip_value": 0.001,
+                      "clip_type": "norm",
+                      "norm_type": 2.0}
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--data", type=str, nargs='+', help="List of datasets used for training.")
+    parser.add_argument("-d", "--data", default=["case_color"], type=str, nargs='+',
+                        help="List of datasets used for training.")
     parser.add_argument("--path_prefix", default="/home/matthias/Data/Ubuntu/data", type=str)
     parser.add_argument("--train_dir", default="datasets/case", type=str)
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
     parser.add_argument("--model", default="retinanet", type=str)
-    parser.add_argument("--batch_size", default=4, type=int, help="Batch size used during training.")
-    parser.add_argument("--learning_rate", default=0.0001, type=float, help="Learning rate used during training.")
-    parser.add_argument("--reduce_lr", default=0., type=float, help="Multiplied by learning rate each iteration.")
-    parser.add_argument("--weight_decay", default=0., type=float, help="Weight decay used during training.")
-    parser.add_argument("--warmup_fraction", default=0., type=float,
+    parser.add_argument("--batch_size", default=default_values["batch_size"], type=int,
+                        help="Batch size used during training.")
+    parser.add_argument("--learning_rate", default=default_values["learning_rate"], type=float,
+                        help="Learning rate used during training.")
+    parser.add_argument("--reduce_lr", default=default_values["reduce_lr"], type=float,
+                        help="Multiplied by learning rate each iteration.")
+    parser.add_argument("--weight_decay", default=default_values["weight_decay"], type=float,
+                        help="Weight decay used during training.")
+    parser.add_argument("--warmup_fraction", default=default_values["warmup_fraction"], type=float,
                         help="Learning rate warmup in fraction of total steps.")
     parser.add_argument("--clip_gradients", action="store_true", help="Gradients are clipped at 'clip_value'.")
-    parser.add_argument("--clip_value", default=0.001, type=float, help="Threshold for gradient clipping.")
+    parser.add_argument("--clip_value", default=default_values["clip_value"], type=float,
+                        help="Threshold for gradient clipping.")
     parser.add_argument("--clip_type", default="value", type=str,
                         help="Gradients can be clipped at 'clip_value' value or their norm")
-    parser.add_argument("--norm_type", default=2.0, type=float, help="Norm type for 'norm' gradient clipping.")
-    parser.add_argument("--epochs", default=2.0, type=float, help="(Fraction of) epochs to train.")
-    parser.add_argument("--visualize", default=False, type=bool, help="Visualize training data.")
+    parser.add_argument("--norm_type", default=default_values["norm_type"], type=float,
+                        help="Norm type for 'norm' gradient clipping.")
+    parser.add_argument("--epochs", default=default_values["epochs"], type=float,
+                        help="(Fraction of) epochs to train.")
+    parser.add_argument("--visualize", action="store_true", help="Visualize training data.")
+    parser.add_argument("--predict", action="store_true", help="Visualize predictions.")
     args = parser.parse_args()
+
+    if args.model == "retinanet":
+        base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
+        values = {"learning_rate": 0.0001,
+                  "reduce_lr": 0.,
+                  "weight_decay": 0.,
+                  "warmup_fraction": 0.,
+                  "clip_gradients": False}
+    elif args.model == "mask_rcnn":
+        base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
+        values = {"learning_rate": 0.000112884,
+                  "reduce_lr": 0.9,
+                  "weight_decay": 2.4338e-11,
+                  "warmup_fraction": 0.1,
+                  "clip_gradients": True,
+                  "clip_value": 1e-05,
+                  "clip_type": "norm",
+                  "norm_type": 2}
+    else:
+        base_config = args.model
+        values = {"learning_rate": args.learning_rate,
+                  "reduce_lr": args.reduce_lr,
+                  "weight_decay": args.weight_decay,
+                  "warmup_fraction": args.warmup_fraction,
+                  "clip_gradients": args.clip_gradients,
+                  "clip_value": args.clip_value,
+                  "clip_type": args.clip_type,
+                  "norm_type": args.norm_type}
+    output_dir = os.path.join(args.path_prefix, args.out_dir)
 
     train_root = os.path.join(args.path_prefix, args.train_dir)
     val_root = os.path.join(args.path_prefix, args.val_dir)
     dataset_names = load_datasets(train_root, val_root)
-
-    if args.model == "retinanet":
-        base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-    elif args.model == "mask_rcnn":
-        base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
-    else:
-        base_config = args.model
-    output_dir = os.path.join(args.path_prefix, args.out_dir)
-
     train_datasets = parse_data(args.data, dataset_names)
+
     if args.data in ['best', 'all']:
         log_file = f"{args.data}.log"
     else:
@@ -919,14 +959,6 @@ def main(seed: int = 42):
     logger = setup_logger(output=os.path.join(output_dir, log_file), name=__file__)
 
     cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs)
-    values = {"learning_rate": args.learning_rate,
-              "reduce_lr": args.reduce_lr,
-              "weight_decay": args.weight_decay,
-              "warmup_fraction": args.warmup_fraction,
-              "clip_gradients": args.clip_gradients,
-              "clip_value": args.clip_value,
-              "clip_type": args.clip_type,
-              "norm_type": args.norm_type}
     logger.info(values)
     set_cfg_values(cfg, values)
     # load_and_apply_cfg_values(cfg, output_dir)
@@ -936,34 +968,36 @@ def main(seed: int = 42):
         loader = trainer.build_train_loader(cfg)
         # compute_data_statistics(loader)
         visualize_data(cfg, loader)
+    elif args.predict:
+        predict(cfg)
+    else:
+        results = list()
+        for s in np.arange(5):
+            set_all_seeds(s)
+            ap, it = train_eval(cfg)
+            result = np.vstack([ap, it]).T
+            result = result[result[:, 0].argmax()].tolist()
+            result.append(s)
+            results.append(result)
+        results = np.array(results)
 
-    results = list()
-    for s in np.arange(5):
-        set_all_seeds(s)
-        ap, it = train_eval(cfg)
-        result = np.vstack([ap, it]).T
-        result = result[result[:, 0].argmax()].tolist()
-        result.append(s)
-        results.append(result)
-    results = np.array(results)
+        ap = results[:, 0]
+        table = tabulate.tabulate(results[ap.argsort()[::-1]], headers=["AP", "iter", "seed"])
 
-    ap = results[:, 0]
-    table = tabulate.tabulate(results[ap.argsort()[::-1]], headers=["AP", "iter", "seed"])
+        logger.info(table)
+        logger.info(f"Mean AP: {ap.mean()}")
+        logger.info(f"95% conf. interv.: {t.interval(0.95, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
+        logger.info(f"99% conf. interv.: {t.interval(0.99, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
+        logger.info(f"Copy: {np.sort(ap)[::-1]}")
 
-    logger.info(table)
-    logger.info(f"Mean AP: {ap.mean()}")
-    logger.info(f"95% conf. interv.: {t.interval(0.95, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
-    logger.info(f"99% conf. interv.: {t.interval(0.99, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
-    logger.info(f"Copy: {np.sort(ap)[::-1]}")
+        for k, v in get_results_dict().items():
+            # The probability to obtain the current result by chance (assuming the same data generating process) is ...
+            logger.info(f"Statistics for {cfg.DATASETS.TRAIN[0]} vs {k}:")
+            logger.info(ttest_ind(ap, v, equal_var=False))
+            logger.info(f"99% conf. interv. of {k}: {t.interval(0.99, len(v) - 1, loc=np.mean(v), scale=sem(v))}")
+            # ... or less.
 
-    for k, v in get_results_dict().items():
-        # The probability to obtain the current result by chance (assuming the same data generating process) is ...
-        logger.info(f"Statistics for {cfg.DATASETS.TRAIN[0]} vs {k}:")
-        logger.info(ttest_ind(ap, v, equal_var=False))
-        logger.info(f"99% conf. interv. of {k}: {t.interval(0.99, len(v) - 1, loc=np.mean(v), scale=sem(v))}")
-        # ... or less.
-
-    logger.info(f"Runtime: {(time.time() - start) / 60}")
+        logger.info(f"Runtime: {(time.time() - start) / 60}")
 
 
 if __name__ == "__main__":
