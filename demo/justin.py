@@ -650,7 +650,7 @@ def build_config(train_datasets, base_config, output_dir, batch_size: int = 4, e
     cfg.DATASETS.TRAIN = train_datasets
     cfg.DATASETS.TEST = ("justin_test",)
 
-    cfg.DATALOADER.NUM_WORKERS = multiprocessing.cpu_count() - 2
+    # cfg.DATALOADER.NUM_WORKERS = multiprocessing.cpu_count() - 2
 
     cfg.INPUT.MIN_SIZE_TRAIN = (800,)  # (640, 672, 704, 736, 768, 800)
     cfg.INPUT.MAX_SIZE_TRAIN = 1333

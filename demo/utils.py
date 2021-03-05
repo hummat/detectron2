@@ -98,18 +98,18 @@ def get_space():
              # skopt.space.Categorical([0., .1, .5, 1.], name="grayscale"),
              # skopt.space.Categorical([0., .1, .5, 1.], name="invert"),
              # skopt.space.Categorical([0., .01, .1, .3, .5, 1.], name="hist"),
-             skopt.space.Real(0., 1., name="photometric"),
+             skopt.space.Real(0., 2., name="photometric"),
              # skopt.space.Real(0., .1, name="noise"),
-             skopt.space.Real(0., .5, name="cam_noise"),
-             skopt.space.Real(0., .5, name="motion_blur"),
+             skopt.space.Real(0., 1., name="cam_noise"),
+             skopt.space.Real(0., 1., name="motion_blur"),
              # skopt.space.Real(0., 1., name="gaussian_blur"),
-             skopt.space.Real(0., 1., name="cutout"),
+             skopt.space.Real(0., 2., name="cutout"),
              skopt.space.Categorical([10, 50, 100, 200], name="cutout_sizes"),
-             skopt.space.Real(0., 1., name="sharpen"),
-             skopt.space.Real(0., 1., name="clahe"),
-             skopt.space.Real(0., 1., name="channel_dropout"),
-             skopt.space.Real(0., 1., name="grayscale"),
-             skopt.space.Real(0., 1., name="invert"),
+             skopt.space.Real(0., 2., name="sharpen"),
+             skopt.space.Real(0., 2., name="clahe"),
+             skopt.space.Real(0., 2., name="channel_dropout"),
+             skopt.space.Real(0., 2., name="grayscale"),
+             skopt.space.Real(0., 2., name="invert"),
              skopt.space.Real(0., 3., name="hist_fda"),
              skopt.space.Categorical([True, False], name="vignette"),
              skopt.space.Categorical([True, False], name="chromatic"),
@@ -122,7 +122,7 @@ def get_space():
              # skopt.space.Categorical([True, False], name="nesterov"),
              # skopt.space.Categorical(["WarmupCosineLR", "WarmupMultiStepLR"], name="lr_scheduler"),
              skopt.space.Categorical([0., .1], name="warmup_fraction"),
-             skopt.space.Categorical([.7, .8, .9, 1.], name="random_crop"),
+             skopt.space.Categorical([.7, .8, .9, 1., 1., 1.], name="random_crop"),
              skopt.space.Categorical([(480,), (640,), (800,), (480, 800), (640, 672, 704, 736, 768, 800)], name="scales"),
              skopt.space.Categorical([True, False], name="clip_gradients"),
              # skopt.space.Categorical([1e-7, 1e-6, 1e-5, 1e-4, 1e-3], name="clip_value"),
@@ -203,35 +203,44 @@ def set_cfg_values(cfg, values):
     if "random_types" in values:
         cfg.RANDOM_TYPES = values["random_types"]
     if "photometric" in values:
-        max_val = values["photometric"]
-        cfg.PHOTOMETRIC = [[0., max_val], [0., max_val], [0., max_val], [0., max_val]] if values["photometric"] else []
-        if "photometric_types" in values:
-            cfg.PHOTOMETRIC_TYPES = values["photometric_types"]
+        if values["photometric"] <= 1.:
+            max_val = values["photometric"]
+            cfg.PHOTOMETRIC = [[0., max_val], [0., max_val], [0., max_val], [0., max_val]] if values["photometric"] else []
+            if "photometric_types" in values:
+                cfg.PHOTOMETRIC_TYPES = values["photometric_types"]
     if "noise" in values:
-        cfg.NOISE = [0., values["noise"]] if values["noise"] else []
+        if values["noise"] <= 1.:
+            cfg.NOISE = [0., values["noise"]] if values["noise"] else []
     if "cam_noise" in values:
-        cfg.CAM_NOISE = [0., values["cam_noise"]] if values["cam_noise"] else []
-        cfg.CAM_NOISE_SHIFT = (0.01, 0.05)
+        if values["cam_noise"] <= .5:
+            cfg.CAM_NOISE = [0., values["cam_noise"]] if values["cam_noise"] else []
+            cfg.CAM_NOISE_SHIFT = (0.01, 0.05)
     if "motion_blur" in values:
-        cfg.MOTION_BLUR = values["motion_blur"]
+        if values["motion_blur"] <= .5:
+            cfg.MOTION_BLUR = values["motion_blur"]
     if "gaussian_blur" in values:
         cfg.GAUSSIAN_BLUR = values["gaussian_blur"]
     if "cutout" in values:
-        cfg.CUTOUT = values["cutout"]
-        if "cutout_sizes" in values:
-            cfg.CUTOUT_SIZES = [values["cutout_sizes"],
-                                values["cutout_sizes"],
-                                None,
-                                None] if cfg.CUTOUT else []
+        if values["cutout"] <= 1.:
+            cfg.CUTOUT = values["cutout"]
+            if "cutout_sizes" in values:
+                cfg.CUTOUT_SIZES = [values["cutout_sizes"],
+                                    values["cutout_sizes"],
+                                    None,
+                                    None] if cfg.CUTOUT else []
     if "sharpen" in values:
-        cfg.SHARPEN = values["sharpen"]
-        cfg.SHARPEN_RANGE = (0., values["sharpen"])
+        if values["sharpen"] <= 1.:
+            cfg.SHARPEN = values["sharpen"]
+            cfg.SHARPEN_RANGE = (0., values["sharpen"])
     if "clahe" in values:
-        cfg.CLAHE = values["clahe"]
+        if values["clahe"] <= 1.:
+            cfg.CLAHE = values["clahe"]
     if "channel_dropout" in values:
-        cfg.CHANNEL_DROPOUT = values["channel_dropout"]
+        if values["channel_dropout"] <= 1.:
+            cfg.CHANNEL_DROPOUT = values["channel_dropout"]
     if "grayscale" in values:
-        cfg.GRAYSCALE = values["grayscale"]
+        if values["grayscale"] <= 1.:
+            cfg.GRAYSCALE = values["grayscale"]
     if "vignette" in values:
         cfg.VIGNETTE = (0., 0.8) if values["vignette"] else 0.
     if "chromatic" in values:

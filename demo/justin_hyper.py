@@ -5,8 +5,8 @@ import tabulate
 import numpy as np
 import argparse
 
-from utils import get_space, get_param_names, set_cfg_values, get_results_dict, parse_data
-from justin import set_all_seeds, setup_logger, load_datasets, build_config, train_eval
+from utils import get_space, get_param_names, set_cfg_values, parse_data
+from justin import set_all_seeds, load_datasets, build_config, train_eval
 
 
 def main(seed):
