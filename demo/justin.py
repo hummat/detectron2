@@ -910,9 +910,13 @@ def main(seed: int = 42):
     else:
         base_config = args.model
     output_dir = os.path.join(args.path_prefix, args.out_dir)
-    logger = setup_logger(output=os.path.join(output_dir, f"{args.data}.log"), name=__file__)
 
     train_datasets = parse_data(args.data, dataset_names)
+    if args.data in ['best', 'all']:
+        log_file = f"{args.data}.log"
+    else:
+        log_file = f"{train_datasets[0] if len(train_datasets) == 1 else '_'.join(train_datasets)}.log"
+    logger = setup_logger(output=os.path.join(output_dir, log_file), name=__file__)
 
     cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs)
     values = {"learning_rate": args.learning_rate,
