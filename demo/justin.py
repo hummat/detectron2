@@ -45,7 +45,7 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.utils.logger import setup_logger
 
-from utils import get_space, get_param_names, set_cfg_values
+from utils import get_space, get_param_names, set_cfg_values, parse_data, get_results_dict
 
 
 # from .eval_loss_hook import LossEvalHook
@@ -873,56 +873,6 @@ def load_and_apply_cfg_values(cfg, output_dir, results_name="skopt_results.pkl")
     set_cfg_values(cfg, values=augmentation_values)
 
 
-def get_results_dict():
-    res_dict = {"case_color": [40.20318213, 35.35496166, 31.02521989, 29.54828771, 27.14293436,
-                               27.09203161, 26.40146892, 23.90050957, 23.23194967, 22.82641386],  # checked
-                "case_hdr_only": [46.15308288, 44.93498767, 40.18497103, 38.49819022, 29.2418928],
-                "case_no_alpha": [48.87262553, 47.59580096, 44.83208555, 40.46059594, 40.40870896],
-                "case_new_cam_tless": [45.47795505, 44.66041727, 40.51798259, 36.96881034, 29.26575374],
-                "case_new_cam": [44.75878892, 42.88613014, 39.33238446, 32.79025745, 32.22301464],
-                "case_new_cam_a": [40.63473765, 33.00102775, 31.36526296, 30.9117473, 30.7852782],
-                "case_new_cam_b": [41.39483998, 39.97691288, 38.96729607, 37.88191947, 34.72803834],
-                "case_best_off": [38.27442956, 36.98222766, 33.18468101, 32.26386027, 30.13600164],  # checked
-                "case_green": [42.07711803, 33.84280772, 33.08787521, 31.47131132, 30.18678932],  # checked
-                "case_white": [21.0838, 17.2644, 12.5009, 11.3386, 6.06284],
-                "case_flat": [37.91878455, 30.64923742, 28.30067853, 27.75824945, 27.34716009],  # checked
-                "case_smooth": [30.82600167, 30.42064908, 27.06868854, 25.34457596, 20.87147743],  # checked
-                "case_refined": [22.3332, 21.3385, 21.0649, 18.4229, 14.5228],
-                "case_cam_k": [29.96887896, 26.99492782, 22.50186606, 16.9611616, 15.7358362],  # checked
-                "case_all_white": [12.8596, 12.1132, 10.5135, 10.4775, 8.79655],
-                "case_50_samples": [29.6049, 23.6589, 23.5817, 21.2605, 20.5096],
-                "case_512_samples": [26.1091, 23.8615, 22.8284, 21.5225, 9.46198],
-                "case_2048_samples": [25.51789534, 23.77423735, 22.73706366, 22.58643221, 20.10152691],  # checked
-                "case_color_texture": [42.27489632, 33.6542957, 32.44540635, 30.33389404, 20.45308856],  # checked
-                "case_texture": [30.93216935, 30.5514081, 28.04813986, 24.42527646, 19.33343886],  # checked
-                "case_more_bounces": [33.83921761, 29.46399028, 27.03319279, 26.84496801, 25.03445091],  # checked
-                "case_area_light": [28.64929296, 26.14490815, 21.8578116, 19.71479663, 17.28886026],  # checked
-                "case_cam_uniform3d_inplane": [31.96673795, 31.26197291, 30.49044743, 24.15643791, 23.57493626],
-                # checked
-                "case_cam_uniform3d": [26.97584852, 26.62969497, 26.14628782, 21.09606741, 20.16900372],  # checked
-                "case_cam_poi": [10.86430437, 7.79265517, 7.42004987, 6.64692292, 6.02255621],  # checked
-                "case_white_light": [31.87034131, 29.22695543, 26.59384891, 23.18313712, 20.93746476],  # checked
-                "case_no_bounces": [32.4185546, 28.64617559, 25.05437995, 23.88907582, 19.67199348],  # checked
-                "case_uniform_clutter": [33.40435191, 31.27687028, 26.87701708, 25.97052168, 23.90796012],  # checked
-                "case_clutter": [36.49185575, 30.14689522, 25.91438832, 25.32848971, 20.45497139],  # checked
-                "case_high_res": [32.10037995, 27.17417729, 17.91426037, 14.40626157, 12.24492306],  # checked
-                "case_point_lights_only": [27.49361244, 25.31737831, 21.3253789, 14.1208087, 11.48722047],  # checked
-                "case_less_light": [26.20951466, 23.10560782, 21.613864, 20.07971469, 4.9723414],  # checked
-                "case_two_lights": [26.07114511, 19.92342411, 11.68455528, 9.60110245, 3.3309312],  # checked
-                "case_even_less_cam_rotation": [41.14436033, 37.58032475, 35.9072579, 34.13007927, 30.49871135],
-                # checked
-                "case_fov": [36.76167819, 35.08760321, 31.27037743, 30.37089514, 26.70382605],  # checked
-                "case_less_cam_rotation": [25.7747, 18.8846, 18.2181, 17.4002, 10.1219],  # checked
-                "case_train_green": [36.01153481, 34.57256129, 31.54693327, 30.22182292, 22.28776532],  # checked
-                "case_test_green": [27.6192, 21.9087, 21.3022, 20.4311, 17.6845],  # checked
-                "case_no_specular": [19.30362239, 18.9428661, 17.37443433, 13.01278383, 11.54669053],  # checked
-                "case_no_denoiser": [30.0072, 27.3804, 25.6204, 22.7732, 19.3679],  # checked
-                "case_no_glossy": [35.6989, 29.8466, 29.3413, 25.6552, 17.015],  # checked
-                "case_no_rough": [35.69471537, 33.93573952, 30.49634283, 30.43674663, 24.45885994],  # checked
-                "case_no_point_light": [40.83368553, 34.71397511, 32.09706752, 27.477971, 25.45296477]}  # checked
-    return res_dict
-
-
 def main(seed: int = 42):
     start = time.time()
     set_all_seeds(seed)
@@ -962,27 +912,7 @@ def main(seed: int = 42):
     output_dir = os.path.join(args.path_prefix, args.out_dir)
     logger = setup_logger(output=os.path.join(output_dir, f"{args.data}.log"), name=__file__)
 
-    if len(args.data) == 1:
-        data = args.data[0]
-        assert (data in dataset_names or data in ['all', 'best'])
-        train_datasets = list()
-        if data == 'all':
-            train_datasets = dataset_names
-        elif data == 'best':
-            best_datasets = list()
-            for k, v in get_results_dict().items():
-                best_datasets.append([np.mean(v), np.max(v)])
-            best_mean = np.quantile(np.array(best_datasets)[:, 0], q=.9)
-            best_max = np.quantile(np.array(best_datasets)[:, 1], q=.9)
-            for k, v in get_results_dict().items():
-                if np.mean(v) >= best_mean or np.max(v) >= best_max:
-                    train_datasets.append(k)
-        else:
-            train_datasets.append(data)
-    elif isinstance(args.data, (list, tuple)):
-        train_datasets = args.data
-    else:
-        raise AttributeError
+    train_datasets = parse_data(args.data, dataset_names)
 
     cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs)
     values = {"learning_rate": args.learning_rate,

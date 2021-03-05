@@ -5,8 +5,8 @@ import tabulate
 import numpy as np
 import argparse
 
-from utils import get_space, get_param_names, set_cfg_values
-from justin import set_all_seeds, setup_logger, load_datasets, get_results_dict, build_config, train_eval
+from utils import get_space, get_param_names, set_cfg_values, get_results_dict, parse_data
+from justin import set_all_seeds, setup_logger, load_datasets, build_config, train_eval
 
 
 def main(seed):
@@ -19,6 +19,7 @@ def main(seed):
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
     parser.add_argument("--model", default="retinanet", type=str)
+    parser.add_argument("--epochs", default=2.0, type=float, help="(Fraction of) epochs to train.")
     parser.add_argument("--calls", default=50, type=int, help="Number of hyperparameter search evaluations.")
     args = parser.parse_args()
 
@@ -34,33 +35,12 @@ def main(seed):
         base_config = args.model
     output_dir = os.path.join(args.path_prefix, args.out_dir)
 
-    if len(args.data) == 1:
-        data = args.data[0]
-        assert (data in dataset_names or data in ['all', 'best'])
-        train_datasets = list()
-        if data == 'all':
-            train_datasets = dataset_names
-        elif data == 'best':
-            best_datasets = list()
-            for k, v in get_results_dict().items():
-                best_datasets.append([np.mean(v), np.max(v)])
-            best_mean = np.quantile(np.array(best_datasets)[:, 0], q=.9)
-            best_max = np.quantile(np.array(best_datasets)[:, 1], q=.9)
-            for k, v in get_results_dict().items():
-                if np.mean(v) >= best_mean or np.max(v) >= best_max:
-                    train_datasets.append(k)
-        else:
-            train_datasets.append(data)
-    elif isinstance(args.data, (list, tuple)):
-        train_datasets = args.data
-    else:
-        raise AttributeError
-
+    train_datasets = parse_data(args.data, dataset_names)
     space = get_space()
 
     @skopt.utils.use_named_args(dimensions=space)
     def objective(**params):
-        cfg = build_config(train_datasets, base_config, output_dir, batch_size=params["batch_size"])
+        cfg = build_config(train_datasets, base_config, output_dir, batch_size=params["batch_size"], epochs=args.epochs)
         set_cfg_values(cfg, params)
         print(tabulate.tabulate(np.expand_dims(list(params.values()), axis=0), headers=list(params.keys())))
         try:
@@ -77,7 +57,7 @@ def main(seed):
         print("AP:", ap)
         return 100. if np.isnan(ap) else 100. - ap
 
-    res = skopt.gp_minimize(func=objective, dimensions=space, n_calls=args.calls, random_state=seed, verbose=True)
+    res = skopt.forest_minimize(func=objective, dimensions=space, n_calls=args.calls, random_state=seed, verbose=True)
     res_sorted = np.concatenate([np.expand_dims(100. - res.func_vals, axis=1), res.x_iters], axis=1)
     print()
     print(tabulate.tabulate(res_sorted[res_sorted[:, 0].argsort()[::-1]], headers=["AP"] + get_param_names(space)))
