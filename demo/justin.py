@@ -264,7 +264,7 @@ class ChromaticAberration(Augmentation):
         self._init(locals())
 
     def get_transform(self, image):
-        img = Image.fromarray(image)
+        img = Image.fromarray(image).convert("RGB")
         r, g, b = img.split()
         rdata = np.asarray(r)
 
@@ -289,11 +289,11 @@ class ChromaticAberration(Augmentation):
         ghdiff = (bheight - gheight) // 2
         gwdiff = (bwidth - gwidth) // 2
 
-        img = Image.merge("RGB", (rfinal.crop((-rwdiff, -rhdiff, bwidth - rwdiff, bheight - rhdiff)),
+        img = Image.merge('RGB', (rfinal.crop((-rwdiff, -rhdiff, bwidth - rwdiff, bheight - rhdiff)),
                                   gfinal.crop((-gwdiff, -ghdiff, bwidth - gwdiff, bheight - ghdiff)),
                                   bfinal))
-
-        return ReturnTransform(image=np.asarray(img.crop((rwdiff, rhdiff, rwidth + rwdiff, rheight + rhdiff))))
+        img = np.asarray(img.crop((rwdiff, rhdiff, rwidth + rwdiff, rheight + rhdiff)))[:, :, ::-1]
+        return ReturnTransform(image=img)
 
 
 class ApplyAEAug(Augmentation):
@@ -439,7 +439,14 @@ class Trainer(DefaultTrainer):
             augmentations.append(Cutout(holes=cfg.CUTOUT_HOLES, size=cfg.CUTOUT_SIZES, p=cfg.CUTOUT))
         mapper = DatasetMapper(is_train=True, use_instance_mask=cfg.MODEL.MASK_ON, instance_mask_format='bitmask',
                                augmentations=augmentations, image_format='BGR')
-        return build_detection_train_loader(cfg, mapper, num_workers=cfg.DATALOADER.NUM_WORKERS)
+        return build_detection_train_loader(cfg, mapper=mapper, num_workers=cfg.DATALOADER.NUM_WORKERS)
+
+    @classmethod
+    def build_test_loader(cls, cfg, dataset_name):
+        mapper = DatasetMapper(is_train=False, use_instance_mask=cfg.MODEL.MASK_ON, instance_mask_format='bitmask',
+                               augmentations=utils.build_augmentation(cfg, is_train=False), image_format='BGR')
+        return build_detection_test_loader(dataset=DatasetCatalog.get(dataset_name), mapper=mapper,
+                                           num_workers=cfg.DATALOADER.NUM_WORKERS)
 
 
 def get_justin_dicts(directory: str):
@@ -643,102 +650,6 @@ def set_all_seeds(seed: int):
     os.environ['PYTHONHASHSEED'] = str(seed)
 
 
-def build_config(train_datasets, base_config, output_dir, batch_size: int = 4, epochs=2.):
-    cfg = get_cfg()
-    cfg.merge_from_file(model_zoo.get_config_file(base_config))
-
-    cfg.DATASETS.TRAIN = train_datasets
-    cfg.DATASETS.TEST = ("justin_test",)
-
-    # cfg.DATALOADER.NUM_WORKERS = multiprocessing.cpu_count() - 2
-
-    cfg.INPUT.MIN_SIZE_TRAIN = (800,)  # (640, 672, 704, 736, 768, 800)
-    cfg.INPUT.MAX_SIZE_TRAIN = 1333
-    cfg.INPUT.MIN_SIZE_TEST = 800
-    cfg.INPUT.MAX_SIZE_TEST = 1333
-    cfg.INPUT.CROP.ENABLED = False
-    cfg.INPUT.CROP.SIZE = [.9, .9]
-
-    cfg.SOLVER.IMS_PER_BATCH = int(batch_size)
-
-    cfg.NUM_BATCHES = 0
-    for ds in cfg.DATASETS.TRAIN:
-        cfg.NUM_BATCHES += len(DatasetCatalog.get(ds))
-    cfg.NUM_BATCHES = cfg.NUM_BATCHES // cfg.SOLVER.IMS_PER_BATCH
-    cfg.EPOCHS = epochs
-
-    cfg.SOLVER.BASE_LR = 0.0001
-    cfg.SOLVER.MAX_ITER = int(cfg.EPOCHS * cfg.NUM_BATCHES)
-    cfg.SOLVER.CHECKPOINT_PERIOD = cfg.NUM_BATCHES  # Checkpoint every epoch
-    cfg.SOLVER.WEIGHT_DECAY = 0.0
-    cfg.SOLVER.MOMENTUM = 0.9
-    cfg.SOLVER.NESTEROV = False
-    cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"
-    # Linear warm up to base learning rate within 20% of all iterations
-    cfg.SOLVER.WARMUP_ITERS = 1  # int(cfg.SOLVER.MAX_ITER * .2)
-    cfg.SOLVER.WARMUP_FACTOR = 1.0 / float(cfg.SOLVER.WARMUP_ITERS)
-    cfg.SOLVER.WARMUP_METHOD = "linear"
-    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False
-    cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE = "norm"
-    cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = 0.001
-    cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.0
-    cfg.SOLVER.GAMMA = 1.0  # .99
-    cfg.SOLVER.STEPS = (1,)  # [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
-
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_config)
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05
-    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
-    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.05
-    cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
-
-    cfg.TEST.EVAL_PERIOD = 100
-    cfg.TEST.DETECTIONS_PER_IMAGE = 100
-    cfg.MODEL.RETINANET.NUM_CLASSES = 1
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
-    cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES = 1
-
-    cfg.OPTIMIZER = "ADAM"
-    cfg.LOGGER = True
-
-    cfg.ROTATE = False
-    cfg.PHOTOMETRIC = []
-    cfg.PHOTOMETRIC_TYPES = ['brightness', 'contrast', 'saturation', 'lighting']
-    cfg.INTERP = Image.BILINEAR
-    cfg.NOISE = []
-    cfg.NOISE_TYPES = ['poisson', 'gaussian', 'speckle', 's&p']
-    cfg.CAM_NOISE = []
-    cfg.CAM_NOISE_SHIFT = [0.01, 0.05]
-    cfg.RANDOM_TYPES = True
-    cfg.DENOISE = False
-    cfg.CUTOUT = 0.
-    cfg.CUTOUT_SIZES = [100, 100, None, None]
-    cfg.CUTOUT_HOLES = [5, 1]
-    cfg.MOTION_BLUR = 0.
-    cfg.GAUSSIAN_BLUR = 0.
-    cfg.KERNEL_SIZE = 11
-    cfg.FLIP = "both"
-    cfg.INVERT = 0.
-    cfg.GRAYSCALE = 0.
-    cfg.CHANNEL_DROPOUT = 0.
-    cfg.HISTOGRAM = []
-    cfg.FDA = 0.
-    cfg.REFERENCE = [sample['file_name'] for sample in random.sample(DatasetCatalog.get(cfg.DATASETS.TEST[0]), 100)]
-    cfg.SHARPEN = 0.
-    cfg.SHARPEN_RANGE = [0.2, .5]
-    cfg.CLAHE = 0.
-    cfg.MOSAIC = False
-    cfg.JPEG = False
-    cfg.VIGNETTE = 0.  # (0., 0.8)
-    cfg.CHROMATIC_ABERRATION = 0.  # (0., 0.5)
-    cfg.AUTO_AUGMENT = False
-    # gaussian blur, contrast, brightness, color and sharpness filters, cutout
-
-    cfg.OUTPUT_DIR = output_dir
-    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
-
-    return cfg
-
-
 def get_model(cfg):
     model = build_model(cfg)
     checkpointer = DetectionCheckpointer(model)
@@ -872,6 +783,110 @@ def load_and_apply_cfg_values(cfg, output_dir, results_name="skopt_results.pkl")
     set_cfg_values(cfg, values=augmentation_values)
 
 
+def build_config(train_datasets, base_config, output_dir, batch_size: int = 4, epochs=2., weights: str = 'coco'):
+    cfg = get_cfg()
+    cfg.merge_from_file(model_zoo.get_config_file(base_config))
+
+    cfg.DATASETS.TRAIN = train_datasets
+    cfg.DATASETS.TEST = ("justin_test",)
+
+    # cfg.DATALOADER.NUM_WORKERS = multiprocessing.cpu_count() - 2
+
+    cfg.INPUT.MIN_SIZE_TRAIN = (800,)  # (640, 672, 704, 736, 768, 800)
+    cfg.INPUT.MAX_SIZE_TRAIN = 1333
+    cfg.INPUT.MIN_SIZE_TEST = 800
+    cfg.INPUT.MAX_SIZE_TEST = 1333
+    cfg.INPUT.CROP.ENABLED = False
+    cfg.INPUT.CROP.SIZE = [.9, .9]
+
+    cfg.SOLVER.IMS_PER_BATCH = int(batch_size)
+
+    cfg.NUM_BATCHES = 0
+    for ds in cfg.DATASETS.TRAIN:
+        cfg.NUM_BATCHES += len(DatasetCatalog.get(ds))
+    cfg.NUM_BATCHES = cfg.NUM_BATCHES // cfg.SOLVER.IMS_PER_BATCH
+    cfg.EPOCHS = epochs
+
+    cfg.SOLVER.BASE_LR = 0.0001
+    cfg.SOLVER.MAX_ITER = int(cfg.EPOCHS * cfg.NUM_BATCHES)
+    cfg.SOLVER.CHECKPOINT_PERIOD = cfg.NUM_BATCHES  # Checkpoint every epoch
+    cfg.SOLVER.WEIGHT_DECAY = 0.0
+    cfg.SOLVER.MOMENTUM = 0.9
+    cfg.SOLVER.NESTEROV = False
+    cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"
+    # Linear warm up to base learning rate within 20% of all iterations
+    cfg.SOLVER.WARMUP_ITERS = 1  # int(cfg.SOLVER.MAX_ITER * .2)
+    cfg.SOLVER.WARMUP_FACTOR = 1.0 / float(cfg.SOLVER.WARMUP_ITERS)
+    cfg.SOLVER.WARMUP_METHOD = "linear"
+    cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False
+    cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE = "norm"
+    cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = 0.001
+    cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.0
+    cfg.SOLVER.GAMMA = 1.0  # .99
+    cfg.SOLVER.STEPS = (1,)  # [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
+
+    if weights.lower() == "coco":
+        cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_config)
+    elif weights.lower() == "none":
+        cfg.MODEL.WEIGHTS = ""
+    elif weights.lower() == "imagenet":
+        pass
+    else:
+        raise ValueError(f"Weights must be one of 'coco', 'imagenet' or 'none', not {weights}")
+
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05
+    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
+    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.05
+    cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
+
+    cfg.TEST.EVAL_PERIOD = 100
+    cfg.TEST.DETECTIONS_PER_IMAGE = 100
+    cfg.MODEL.RETINANET.NUM_CLASSES = 1
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
+    cfg.MODEL.SEM_SEG_HEAD.NUM_CLASSES = 1
+
+    cfg.OPTIMIZER = "ADAM"
+    cfg.LOGGER = True
+
+    cfg.ROTATE = False
+    cfg.PHOTOMETRIC = []
+    cfg.PHOTOMETRIC_TYPES = ['brightness', 'contrast', 'saturation', 'lighting']
+    cfg.INTERP = Image.BILINEAR
+    cfg.NOISE = []
+    cfg.NOISE_TYPES = ['poisson', 'gaussian', 'speckle', 's&p']
+    cfg.CAM_NOISE = []
+    cfg.CAM_NOISE_SHIFT = [0.01, 0.1]
+    cfg.RANDOM_TYPES = True
+    cfg.DENOISE = False
+    cfg.CUTOUT = 0.
+    cfg.CUTOUT_SIZES = [100, 100, None, None]
+    cfg.CUTOUT_HOLES = [5, 1]
+    cfg.MOTION_BLUR = 0.
+    cfg.GAUSSIAN_BLUR = 0.
+    cfg.KERNEL_SIZE = 11
+    cfg.FLIP = "both"
+    cfg.INVERT = 0.
+    cfg.GRAYSCALE = 0.
+    cfg.CHANNEL_DROPOUT = 0.
+    cfg.HISTOGRAM = []
+    cfg.FDA = 0.
+    cfg.REFERENCE = [sample['file_name'] for sample in random.sample(DatasetCatalog.get(cfg.DATASETS.TEST[0]), 100)]
+    cfg.SHARPEN = 0.
+    cfg.SHARPEN_RANGE = [0.2, .5]
+    cfg.CLAHE = 0.
+    cfg.MOSAIC = False
+    cfg.JPEG = False
+    cfg.VIGNETTE = 0.  # (0., 0.8)
+    cfg.CHROMATIC_ABERRATION = 0.  # (0., 0.5)
+    cfg.AUTO_AUGMENT = False
+    # gaussian blur, contrast, brightness, color and sharpness filters, cutout
+
+    cfg.OUTPUT_DIR = output_dir
+    os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
+
+    return cfg
+
+
 def main(seed: int = 42):
     start = time.time()
     set_all_seeds(seed)
@@ -895,6 +910,7 @@ def main(seed: int = 42):
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
     parser.add_argument("--model", default="retinanet", type=str)
+    parser.add_argument("--weights", default="coco", type=str)
     parser.add_argument("--batch_size", default=default_values["batch_size"], type=int,
                         help="Batch size used during training.")
     parser.add_argument("--learning_rate", default=default_values["learning_rate"], type=float,
@@ -957,7 +973,7 @@ def main(seed: int = 42):
         log_file = f"{train_datasets[0] if len(train_datasets) == 1 else '_'.join(train_datasets)}.log"
     logger = setup_logger(output=os.path.join(output_dir, log_file), name=__file__)
 
-    cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs)
+    cfg = build_config(train_datasets, base_config, output_dir, args.batch_size, args.epochs, args.weights)
     logger.info(values)
     set_cfg_values(cfg, values)
     # load_and_apply_cfg_values(cfg, output_dir)

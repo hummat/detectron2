@@ -89,60 +89,26 @@ def parse_data(data: list, dataset_names: list):
 
 
 def get_space():
-    space = [skopt.space.Real(1e-5, 1e-4, name="learning_rate", prior='log-uniform'),
-             # skopt.space.Categorical([2, 4], name="batch_size"),
-             # skopt.space.Categorical([.1, .2, .5, 1.], name="epochs"),
-             # skopt.space.Categorical([True, False], name="rotate"),
-             # skopt.space.Categorical([0., .05, .1, .2, .5, .7, 1.], name="photometric"),
-             # skopt.space.Categorical([0., .0001, .0005, .001, .005, .01, .05, .1], name="noise"),
-             # skopt.space.Categorical([0., .1, .2, .3, .4, .5], name="cam_noise"),
-             # skopt.space.Categorical([0., .1, .2, .3, .4, .5], name="motion_blur"),
-             # skopt.space.Categorical([0., .1, .3, .5, 1.], name="cutout"),
-             # skopt.space.Categorical([10, 50, 100, 200], name="cutout_sizes"),
-             # skopt.space.Categorical([0., .1, .5, 1.], name="sharpen"),
-             # skopt.space.Categorical([0., .1, .5, 1.], name="clahe"),
-             # skopt.space.Categorical([0., .1, .5, 1.], name="channel_dropout"),
-             # skopt.space.Categorical([0., .1, .5, 1.], name="grayscale"),
-             # skopt.space.Categorical([0., .1, .5, 1.], name="invert"),
-             # skopt.space.Categorical([0., .01, .1, .3, .5, 1.], name="hist"),
+    space = [skopt.space.Real(1e-6, 1e-4, name="learning_rate", prior='log-uniform'),
+             skopt.space.Categorical([True, False], name="random_data"),
+             skopt.space.Categorical([1, 2, 3], name="epochs"),
+             skopt.space.Categorical(["coco", "imagenet", "none"], name="weights"),
              skopt.space.Real(0.0, 2.0, name="photometric"),
              skopt.space.Categorical([True, False], name="random_types"),
-             # skopt.space.Real(0., .1, name="noise"),
-             skopt.space.Real(0.0, 1.0, name="cam_noise"),
-             skopt.space.Real(0.0, 1.0, name="motion_blur"),
-             # skopt.space.Real(0., 1., name="gaussian_blur"),
+             skopt.space.Categorical([True, False], name="cam_noise"),
+             skopt.space.Categorical([True, False], name="noise"),
+             skopt.space.Real(0.0, 2.0, name="motion_blur"),
              skopt.space.Real(0.0, 2.0, name="cutout"),
              skopt.space.Categorical([10, 50, 100, 200], name="cutout_sizes"),
              skopt.space.Real(0.0, 2.0, name="sharpen"),
              skopt.space.Real(0.0, 2.0, name="clahe"),
              skopt.space.Real(0.0, 2.0, name="channel_dropout"),
-             # skopt.space.Real(0.0, 2.0, name="grayscale"),
              skopt.space.Real(0.0, 2.0, name="invert"),
              skopt.space.Real(0.0, 2.0, name="hist"),
              skopt.space.Categorical([True, False], name="vignette"),
              skopt.space.Categorical([True, False], name="chromatic"),
-             # skopt.space.Categorical([True, False], name="denoise"),
-             # skopt.space.Categorical([Image.BILINEAR, Image.NEAREST, Image.LANCZOS, Image.BICUBIC, Image.LINEAR,
-             #                          Image.CUBIC], name="interp")]
-             # skopt.space.Categorical(["SGD", "ADAM"], name="optimizer"),
-             # skopt.space.Real(1e-15, 1e-7, name="weight_decay", prior='log-uniform'),
-             # skopt.space.Categorical([0.0, 0.9, 0.95, 0.99], name="momentum"),
-             # skopt.space.Categorical([True, False], name="nesterov"),
-             # skopt.space.Categorical(["WarmupCosineLR", "WarmupMultiStepLR"], name="lr_scheduler"),
              skopt.space.Categorical([0.0, 0.1, 0.2, 0.3], name="warmup_fraction"),
-             # skopt.space.Categorical([.7, .8, .9, 1., 1., 1.], name="random_crop"),
-             # skopt.space.Categorical([(480,), (640,), (800,), (480, 800), (640, 672, 704, 736, 768, 800)], name="scales"),
-             # skopt.space.Categorical([True, False], name="clip_gradients"),
-             # skopt.space.Categorical([1e-7, 1e-6, 1e-5, 1e-4, 1e-3], name="clip_value"),
-             # skopt.space.Categorical(["norm", "value"], name="clip_type")]
-             # skopt.space.Categorical([1., 2., np.inf], name="norm_type"),
              skopt.space.Categorical([0.0, 0.9, 0.99], name="reduce_lr")]
-    # skopt.space.Categorical([True, False], name="change_num_classes"),
-    # skopt.space.Categorical([#"COCO-Detection/retinanet_R_50_FPN_1x.yaml",
-    # "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-    # "COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml",
-    # "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
-    # ], name="model")]
     return space
 
 
@@ -218,14 +184,12 @@ def set_cfg_values(cfg, values):
             if "photometric_types" in values:
                 cfg.PHOTOMETRIC_TYPES = values["photometric_types"]
     if "noise" in values:
-        if values["noise"] <= 1.0:
-            cfg.NOISE = [0.0, values["noise"]] if values["noise"] else []
+        cfg.NOISE = [0.0, 0.1] if values["noise"] else []
     if "cam_noise" in values:
-        if values["cam_noise"] <= 0.5:
-            cfg.CAM_NOISE = [0.0, values["cam_noise"]] if values["cam_noise"] else []
-            cfg.CAM_NOISE_SHIFT = (0.01, 0.05)
+        cfg.CAM_NOISE = [1.0, 1.0] if values["cam_noise"] else []
+        cfg.CAM_NOISE_SHIFT = (0.05, 0.1)
     if "motion_blur" in values:
-        if values["motion_blur"] <= 0.5:
+        if values["motion_blur"] <= 1.0:
             cfg.MOTION_BLUR = values["motion_blur"]
     if "gaussian_blur" in values:
         cfg.GAUSSIAN_BLUR = values["gaussian_blur"]

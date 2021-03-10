@@ -1,4 +1,5 @@
 import os
+import random
 
 import skopt
 import tabulate
@@ -42,7 +43,19 @@ def main(seed=None):
 
     @skopt.utils.use_named_args(dimensions=space)
     def objective(**params):
-        cfg = build_config(train_datasets, base_config, output_dir, batch_size=args.batch_size, epochs=args.epochs)
+        if "random_data" in params and len(train_datasets) > 1:
+            train_ds = random.sample(train_datasets, random.randint(0, len(train_datasets)))
+        else:
+            train_ds = train_datasets
+        if "batch_size" in params:
+            batch_size = params["batch_size"]
+        else:
+            batch_size = args.batch_size
+        if "epochs" in params:
+            epochs = params["epochs"]
+        else:
+            epochs = args.epochs
+        cfg = build_config(train_ds, base_config, output_dir, batch_size, epochs)
         set_cfg_values(cfg, params)
         print(tabulate.tabulate(np.expand_dims(list(params.values()), axis=0), headers=list(params.keys())))
         try:
