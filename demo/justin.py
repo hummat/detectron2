@@ -667,29 +667,29 @@ def build_config(train_datasets, base_config, output_dir, batch_size: int = 4, e
     cfg.NUM_BATCHES = cfg.NUM_BATCHES // cfg.SOLVER.IMS_PER_BATCH
     cfg.EPOCHS = epochs
 
-    cfg.SOLVER.BASE_LR = 0.0001  # 4.925e-05
+    cfg.SOLVER.BASE_LR = 0.0001
     cfg.SOLVER.MAX_ITER = int(cfg.EPOCHS * cfg.NUM_BATCHES)
     cfg.SOLVER.CHECKPOINT_PERIOD = cfg.NUM_BATCHES  # Checkpoint every epoch
-    cfg.SOLVER.WEIGHT_DECAY = 0.  # 3.26758e-05
-    cfg.SOLVER.MOMENTUM = .9
+    cfg.SOLVER.WEIGHT_DECAY = 0.0
+    cfg.SOLVER.MOMENTUM = 0.9
     cfg.SOLVER.NESTEROV = False
     cfg.SOLVER.LR_SCHEDULER_NAME = "WarmupMultiStepLR"
     # Linear warm up to base learning rate within 20% of all iterations
     cfg.SOLVER.WARMUP_ITERS = 1  # int(cfg.SOLVER.MAX_ITER * .2)
-    cfg.SOLVER.WARMUP_FACTOR = 1. / float(cfg.SOLVER.WARMUP_ITERS)
+    cfg.SOLVER.WARMUP_FACTOR = 1.0 / float(cfg.SOLVER.WARMUP_ITERS)
     cfg.SOLVER.WARMUP_METHOD = "linear"
     cfg.SOLVER.CLIP_GRADIENTS.ENABLED = False
     cfg.SOLVER.CLIP_GRADIENTS.CLIP_TYPE = "norm"
-    cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = .001
-    cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.
-    cfg.SOLVER.GAMMA = 1.  # .99
+    cfg.SOLVER.CLIP_GRADIENTS.CLIP_VALUE = 0.001
+    cfg.SOLVER.CLIP_GRADIENTS.NORM_TYPE = 2.0
+    cfg.SOLVER.GAMMA = 1.0  # .99
     cfg.SOLVER.STEPS = (1,)  # [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(1 - cfg.SOLVER.GAMMA, 1, 1 - cfg.SOLVER.GAMMA)]
 
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(base_config)
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = .05
-    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = .5
-    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = .05
-    cfg.MODEL.RETINANET.NMS_THRESH_TEST = .5
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05
+    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
+    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.05
+    cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
 
     cfg.TEST.EVAL_PERIOD = 100
     cfg.TEST.DETECTIONS_PER_IMAGE = 100
@@ -879,12 +879,12 @@ def main(seed: int = 42):
     default_values = {"learning_rate": 0.0001,
                       "batch_size": 4,
                       "epochs": 2.0,
-                      "reduce_lr": 0.,
-                      "weight_decay": 0,
-                      "warmup_fraction": 0.,
+                      "reduce_lr": 0.0,
+                      "weight_decay": 0.0,
+                      "warmup_fraction": 0.0,
                       "clip_gradients": False,
                       "clip_value": 0.001,
-                      "clip_type": "norm",
+                      "clip_type": "value",
                       "norm_type": 2.0}
 
     parser = argparse.ArgumentParser()
@@ -920,21 +920,20 @@ def main(seed: int = 42):
 
     if args.model == "retinanet":
         base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-        values = {"learning_rate": 0.0001,
-                  "reduce_lr": 0.,
-                  "weight_decay": 0.,
-                  "warmup_fraction": 0.,
-                  "clip_gradients": False}
+        values = default_values
     elif args.model == "mask_rcnn":
         base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
-        values = {"learning_rate": 0.000112884,
-                  "reduce_lr": 0.9,
-                  "weight_decay": 2.4338e-11,
-                  "warmup_fraction": 0.1,
-                  "clip_gradients": True,
-                  "clip_value": 1e-05,
-                  "clip_type": "norm",
-                  "norm_type": 2}
+        values = {"learning_rate": 4.28226e-05,
+                  "weight_decay": 1.94036e-13,
+                  "warmup_fraction": 0.2,
+                  "cam_noise": 0.103469,
+                  "hist": 0.56282,
+                  "invert": 1.0,
+                  "cutout": 0.887532,
+                  "cutout_sizes": 100,
+                  "clahe": 0.923281,
+                  "channel_dropout": 0.962356,
+                  "vignette": True}
     else:
         base_config = args.model
         values = {"learning_rate": args.learning_rate,

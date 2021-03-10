@@ -5,6 +5,7 @@ import numpy as np
 def get_results_dict():
     res_dict = {"case_color": [40.20318213, 35.35496166, 31.02521989, 29.54828771, 27.14293436,
                                27.09203161, 26.40146892, 23.90050957, 23.23194967, 22.82641386],  # checked
+                "case_still": [51.14193958, 48.10064759, 44.07146235, 42.59578138, 41.95914484],
                 "case_room": [49.3709824, 45.66797636, 42.06408144, 38.47201768, 38.318354],
                 "case_smile": [38.76968107, 35.22062779, 31.3497792, 28.46137785, 22.17331094],
                 "case_image": [47.08983178, 42.3895778, 39.37276908, 39.00633617, 35.12822138],
@@ -36,8 +37,7 @@ def get_results_dict():
                 "case_texture": [30.93216935, 30.5514081, 28.04813986, 24.42527646, 19.33343886],  # checked
                 "case_more_bounces": [33.83921761, 29.46399028, 27.03319279, 26.84496801, 25.03445091],  # checked
                 "case_area_light": [28.64929296, 26.14490815, 21.8578116, 19.71479663, 17.28886026],  # checked
-                "case_cam_uniform3d_inplane": [31.96673795, 31.26197291, 30.49044743, 24.15643791, 23.57493626],
-                # checked
+                "case_cam_uniform3d_inplane": [31.96673795, 31.26197291, 30.49044743, 24.15643791, 23.57493626],  # checked
                 "case_cam_uniform3d": [26.97584852, 26.62969497, 26.14628782, 21.09606741, 20.16900372],  # checked
                 "case_cam_poi": [10.86430437, 7.79265517, 7.42004987, 6.64692292, 6.02255621],  # checked
                 "case_white_light": [31.87034131, 29.22695543, 26.59384891, 23.18313712, 20.93746476],  # checked
@@ -48,8 +48,7 @@ def get_results_dict():
                 "case_point_lights_only": [27.49361244, 25.31737831, 21.3253789, 14.1208087, 11.48722047],  # checked
                 "case_less_light": [26.20951466, 23.10560782, 21.613864, 20.07971469, 4.9723414],  # checked
                 "case_two_lights": [26.07114511, 19.92342411, 11.68455528, 9.60110245, 3.3309312],  # checked
-                "case_even_less_cam_rotation": [41.14436033, 37.58032475, 35.9072579, 34.13007927, 30.49871135],
-                # checked
+                "case_even_less_cam_rotation": [41.14436033, 37.58032475, 35.9072579, 34.13007927, 30.49871135],  # checked
                 "case_fov": [36.76167819, 35.08760321, 31.27037743, 30.37089514, 26.70382605],  # checked
                 "case_less_cam_rotation": [25.7747, 18.8846, 18.2181, 17.4002, 10.1219],  # checked
                 "case_train_green": [36.01153481, 34.57256129, 31.54693327, 30.22182292, 22.28776532],  # checked
@@ -90,7 +89,7 @@ def parse_data(data: list, dataset_names: list):
 
 
 def get_space():
-    space = [skopt.space.Real(1e-5, 1e-3, name="learning_rate", prior='log-uniform'),
+    space = [skopt.space.Real(1e-5, 1e-4, name="learning_rate", prior='log-uniform'),
              # skopt.space.Categorical([2, 4], name="batch_size"),
              # skopt.space.Categorical([.1, .2, .5, 1.], name="epochs"),
              # skopt.space.Categorical([True, False], name="rotate"),
@@ -106,42 +105,38 @@ def get_space():
              # skopt.space.Categorical([0., .1, .5, 1.], name="grayscale"),
              # skopt.space.Categorical([0., .1, .5, 1.], name="invert"),
              # skopt.space.Categorical([0., .01, .1, .3, .5, 1.], name="hist"),
-             skopt.space.Real(0.0, 2., name="photometric"),
+             skopt.space.Real(0.0, 2.0, name="photometric"),
              skopt.space.Categorical([True, False], name="random_types"),
-             skopt.space.Categorical([("brightness",), ("contrast",), ("contrast", "saturation"),
-                                      ("brightness", "contrast"), ("brightness", "contrast", "saturation"),
-                                      ("brightness", "contrast", "saturation", "lighting")],
-                                     name="photometric_types"),
              # skopt.space.Real(0., .1, name="noise"),
-             skopt.space.Real(0.0, 1., name="cam_noise"),
-             skopt.space.Real(0.0, 1., name="motion_blur"),
+             skopt.space.Real(0.0, 1.0, name="cam_noise"),
+             skopt.space.Real(0.0, 1.0, name="motion_blur"),
              # skopt.space.Real(0., 1., name="gaussian_blur"),
              skopt.space.Real(0.0, 2.0, name="cutout"),
              skopt.space.Categorical([10, 50, 100, 200], name="cutout_sizes"),
              skopt.space.Real(0.0, 2.0, name="sharpen"),
              skopt.space.Real(0.0, 2.0, name="clahe"),
              skopt.space.Real(0.0, 2.0, name="channel_dropout"),
-             skopt.space.Real(0.0, 2.0, name="grayscale"),
+             # skopt.space.Real(0.0, 2.0, name="grayscale"),
              skopt.space.Real(0.0, 2.0, name="invert"),
-             skopt.space.Real(0.0, 3.0, name="hist_fda"),
+             skopt.space.Real(0.0, 2.0, name="hist"),
              skopt.space.Categorical([True, False], name="vignette"),
              skopt.space.Categorical([True, False], name="chromatic"),
              # skopt.space.Categorical([True, False], name="denoise"),
              # skopt.space.Categorical([Image.BILINEAR, Image.NEAREST, Image.LANCZOS, Image.BICUBIC, Image.LINEAR,
              #                          Image.CUBIC], name="interp")]
              # skopt.space.Categorical(["SGD", "ADAM"], name="optimizer"),
-             skopt.space.Real(1e-15, 1e-7, name="weight_decay", prior='log-uniform'),
+             # skopt.space.Real(1e-15, 1e-7, name="weight_decay", prior='log-uniform'),
              # skopt.space.Categorical([0.0, 0.9, 0.95, 0.99], name="momentum"),
              # skopt.space.Categorical([True, False], name="nesterov"),
              # skopt.space.Categorical(["WarmupCosineLR", "WarmupMultiStepLR"], name="lr_scheduler"),
-             skopt.space.Categorical([0.0, 0.1, 0.2], name="warmup_fraction"),
+             skopt.space.Categorical([0.0, 0.1, 0.2, 0.3], name="warmup_fraction"),
              # skopt.space.Categorical([.7, .8, .9, 1., 1., 1.], name="random_crop"),
              # skopt.space.Categorical([(480,), (640,), (800,), (480, 800), (640, 672, 704, 736, 768, 800)], name="scales"),
-             skopt.space.Categorical([True, False], name="clip_gradients"),
+             # skopt.space.Categorical([True, False], name="clip_gradients"),
              # skopt.space.Categorical([1e-7, 1e-6, 1e-5, 1e-4, 1e-3], name="clip_value"),
              # skopt.space.Categorical(["norm", "value"], name="clip_type")]
              # skopt.space.Categorical([1., 2., np.inf], name="norm_type"),
-             skopt.space.Categorical([0.0, 0.1, 0.9, 0.99], name="reduce_lr")]
+             skopt.space.Categorical([0.0, 0.9, 0.99], name="reduce_lr")]
     # skopt.space.Categorical([True, False], name="change_num_classes"),
     # skopt.space.Categorical([#"COCO-Detection/retinanet_R_50_FPN_1x.yaml",
     # "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
@@ -272,6 +267,10 @@ def set_cfg_values(cfg, values):
             cfg.HISTOGRAM = []
         else:
             cfg.HISTOGRAM = []
-            cfg.FDA = []
+            cfg.FDA = 0.0
+    if "hist" in values:
+        if values["hist"] <= 1.0:
+            cfg.HISTOGRAM = [0.0, values["hist"]]
     if "invert" in values:
-        cfg.INVERT = values["invert"] if values["invert"] else 0.0
+        if values["invert"] <= 1.0:
+            cfg.INVERT = values["invert"]

@@ -89,6 +89,15 @@ if __name__ == "__main__":
     main(seed=np.random.randint(2 ** 31 - 1))
 
 """
+      AP    learning_rate    photometric  random_types    photometric_types                                       cam_noise    motion_blur    cutout    cutout_sizes    sharpen     clahe    channel_dropout    grayscale     invert    hist_fda  vignette    chromatic      weight_decay    warmup_fraction  clip_gradients      reduce_lr
+--------  ---------------  -------------  --------------  ----------------------------------------------------  -----------  -------------  --------  --------------  ---------  --------  -----------------  -----------  ---------  ----------  ----------  -----------  --------------  -----------------  ----------------  -----------
+52.058        4.28226e-05      1.89366    True            ('brightness',)                                         0.103469       0.622739   0.887532             100   1.26211   0.923281           0.962356    1.18521    1.24233      1.56282   True        False           1.94036e-13                0.2  False                    0
+46.8321       6.87235e-05      0.99484    False           ('brightness', 'contrast', 'saturation', 'lighting')    0.0815834     0.447135    0.360628               50  1.24189    0.254711           1.06683      1.46498    1.30233     2.49435    True        True            9.20867e-13                0    True                     0.9
+45.6293       0.000290654      1.31423    True            ('contrast',)                                           0.31747        0.440812   0.90653               100  1.15749    1.03711          0.429949       1.77727    0.421703    1.84105    False       False           1.18207e-14                0.2  False                    0.99
+45.0714       6.38393e-05      1.36208    True            ('brightness',)                                         0.0544735      0.390955   0.844674              100  0.0418989  0.527211           1.85124      1.06547    1.17996      2.08706   True        True            4.27169e-13                0.1  False                    0.9
+"""
+
+"""
       AP    learning_rate    batch_size    weight_decay  lr_scheduler         warmup_fraction  clip_gradients      clip_value  clip_type      norm_type    reduce_lr
 --------  ---------------  ------------  --------------  -----------------  -----------------  ----------------  ------------  -----------  -----------  -----------
 50.8236       0.000112884             4     2.4338e-11   WarmupMultiStepLR                0.1  True                    1e-05   norm                   2         0.9
