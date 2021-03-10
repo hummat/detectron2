@@ -168,11 +168,11 @@ class Photometric(Augmentation):
         if self.random_types:
             types = random.sample(self.types, random.randint(0, len(self.types)))
         else:
-            types = self.types
+            types = list(self.types)
 
         if 'brightness' in types:
             offset = self._get_amount(self.types.index('brightness'))
-            composition.append(transforms.RandomBrightness(1. - min(offset, 0.7), 1. + min(offset, 0.7)))
+            composition.append(transforms.RandomBrightness(1. - min(offset, 0.5), 1. + min(offset, 0.5)))
         if 'contrast' in types:
             offset = self._get_amount(self.types.index('contrast'))
             composition.append(transforms.RandomContrast(1. - offset, 1. + offset))

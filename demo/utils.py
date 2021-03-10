@@ -5,11 +5,17 @@ import numpy as np
 def get_results_dict():
     res_dict = {"case_color": [40.20318213, 35.35496166, 31.02521989, 29.54828771, 27.14293436,
                                27.09203161, 26.40146892, 23.90050957, 23.23194967, 22.82641386],  # checked
+                "case_room": [49.3709824, 45.66797636, 42.06408144, 38.47201768, 38.318354],
+                "case_smile": [38.76968107, 35.22062779, 31.3497792, 28.46137785, 22.17331094],
+                "case_image": [47.08983178, 42.3895778, 39.37276908, 39.00633617, 35.12822138],
+                "case_image_a": [45.60643148, 31.29878447, 31.01271054, 28.92226343, 14.79099625],
+                "case_suncg": [46.02135091, 38.33751242, 35.62200875, 33.529601, 33.34456426],
                 "case_junk_alt": [43.56432474, 41.1069868, 40.1089639, 38.97250156, 36.57701396],
                 "case_junk": [45.42713099, 43.03683623, 35.58363348, 28.97702246, 18.69816359],
                 "case_hdr_only": [46.15308288, 44.93498767, 40.18497103, 38.49819022, 29.2418928],
                 "case_haven_hdr": [41.75135572, 34.1886493, 33.31176793, 29.1229799, 28.53087389],
                 "case_no_alpha": [48.87262553, 47.59580096, 44.83208555, 40.46059594, 40.40870896],
+                "case_new_cam_tless_new": [48.16598277, 46.6853439, 45.43259078, 42.09467064, 38.85442359],
                 "case_new_cam_tless_a": [54.17362365, 48.28175825, 46.88282047, 42.33050659, 41.49927066],
                 "case_new_cam_tless": [45.47795505, 44.66041727, 40.51798259, 36.96881034, 29.26575374],
                 "case_new_cam": [44.75878892, 42.88613014, 39.33238446, 32.79025745, 32.22301464],
@@ -30,7 +36,8 @@ def get_results_dict():
                 "case_texture": [30.93216935, 30.5514081, 28.04813986, 24.42527646, 19.33343886],  # checked
                 "case_more_bounces": [33.83921761, 29.46399028, 27.03319279, 26.84496801, 25.03445091],  # checked
                 "case_area_light": [28.64929296, 26.14490815, 21.8578116, 19.71479663, 17.28886026],  # checked
-                "case_cam_uniform3d_inplane": [31.96673795, 31.26197291, 30.49044743, 24.15643791, 23.57493626], # checked
+                "case_cam_uniform3d_inplane": [31.96673795, 31.26197291, 30.49044743, 24.15643791, 23.57493626],
+                # checked
                 "case_cam_uniform3d": [26.97584852, 26.62969497, 26.14628782, 21.09606741, 20.16900372],  # checked
                 "case_cam_poi": [10.86430437, 7.79265517, 7.42004987, 6.64692292, 6.02255621],  # checked
                 "case_white_light": [31.87034131, 29.22695543, 26.59384891, 23.18313712, 20.93746476],  # checked
@@ -41,7 +48,8 @@ def get_results_dict():
                 "case_point_lights_only": [27.49361244, 25.31737831, 21.3253789, 14.1208087, 11.48722047],  # checked
                 "case_less_light": [26.20951466, 23.10560782, 21.613864, 20.07971469, 4.9723414],  # checked
                 "case_two_lights": [26.07114511, 19.92342411, 11.68455528, 9.60110245, 3.3309312],  # checked
-                "case_even_less_cam_rotation": [41.14436033, 37.58032475, 35.9072579, 34.13007927, 30.49871135], # checked
+                "case_even_less_cam_rotation": [41.14436033, 37.58032475, 35.9072579, 34.13007927, 30.49871135],
+                # checked
                 "case_fov": [36.76167819, 35.08760321, 31.27037743, 30.37089514, 26.70382605],  # checked
                 "case_less_cam_rotation": [25.7747, 18.8846, 18.2181, 17.4002, 10.1219],  # checked
                 "case_train_green": [36.01153481, 34.57256129, 31.54693327, 30.22182292, 22.28776532],  # checked
@@ -98,19 +106,24 @@ def get_space():
              # skopt.space.Categorical([0., .1, .5, 1.], name="grayscale"),
              # skopt.space.Categorical([0., .1, .5, 1.], name="invert"),
              # skopt.space.Categorical([0., .01, .1, .3, .5, 1.], name="hist"),
-             skopt.space.Real(0., 2., name="photometric"),
+             skopt.space.Real(0.0, 2., name="photometric"),
+             skopt.space.Categorical([True, False], name="random_types"),
+             skopt.space.Categorical([("brightness",), ("contrast",), ("contrast", "saturation"),
+                                      ("brightness", "contrast"), ("brightness", "contrast", "saturation"),
+                                      ("brightness", "contrast", "saturation", "lighting")],
+                                     name="photometric_types"),
              # skopt.space.Real(0., .1, name="noise"),
-             skopt.space.Real(0., 1., name="cam_noise"),
-             skopt.space.Real(0., 1., name="motion_blur"),
+             skopt.space.Real(0.0, 1., name="cam_noise"),
+             skopt.space.Real(0.0, 1., name="motion_blur"),
              # skopt.space.Real(0., 1., name="gaussian_blur"),
-             skopt.space.Real(0., 2., name="cutout"),
+             skopt.space.Real(0.0, 2.0, name="cutout"),
              skopt.space.Categorical([10, 50, 100, 200], name="cutout_sizes"),
-             skopt.space.Real(0., 2., name="sharpen"),
-             skopt.space.Real(0., 2., name="clahe"),
-             skopt.space.Real(0., 2., name="channel_dropout"),
-             skopt.space.Real(0., 2., name="grayscale"),
-             skopt.space.Real(0., 2., name="invert"),
-             skopt.space.Real(0., 3., name="hist_fda"),
+             skopt.space.Real(0.0, 2.0, name="sharpen"),
+             skopt.space.Real(0.0, 2.0, name="clahe"),
+             skopt.space.Real(0.0, 2.0, name="channel_dropout"),
+             skopt.space.Real(0.0, 2.0, name="grayscale"),
+             skopt.space.Real(0.0, 2.0, name="invert"),
+             skopt.space.Real(0.0, 3.0, name="hist_fda"),
              skopt.space.Categorical([True, False], name="vignette"),
              skopt.space.Categorical([True, False], name="chromatic"),
              # skopt.space.Categorical([True, False], name="denoise"),
@@ -121,20 +134,20 @@ def get_space():
              # skopt.space.Categorical([0.0, 0.9, 0.95, 0.99], name="momentum"),
              # skopt.space.Categorical([True, False], name="nesterov"),
              # skopt.space.Categorical(["WarmupCosineLR", "WarmupMultiStepLR"], name="lr_scheduler"),
-             skopt.space.Categorical([0., .1], name="warmup_fraction"),
-             skopt.space.Categorical([.7, .8, .9, 1., 1., 1.], name="random_crop"),
-             skopt.space.Categorical([(480,), (640,), (800,), (480, 800), (640, 672, 704, 736, 768, 800)], name="scales"),
+             skopt.space.Categorical([0.0, 0.1, 0.2], name="warmup_fraction"),
+             # skopt.space.Categorical([.7, .8, .9, 1., 1., 1.], name="random_crop"),
+             # skopt.space.Categorical([(480,), (640,), (800,), (480, 800), (640, 672, 704, 736, 768, 800)], name="scales"),
              skopt.space.Categorical([True, False], name="clip_gradients"),
              # skopt.space.Categorical([1e-7, 1e-6, 1e-5, 1e-4, 1e-3], name="clip_value"),
              # skopt.space.Categorical(["norm", "value"], name="clip_type")]
              # skopt.space.Categorical([1., 2., np.inf], name="norm_type"),
-             skopt.space.Categorical([0., .1, .9, .99], name="reduce_lr")]
-             # skopt.space.Categorical([True, False], name="change_num_classes"),
-             #skopt.space.Categorical([#"COCO-Detection/retinanet_R_50_FPN_1x.yaml",
-                                      #"COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-                                      #"COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml",
-                                      #"COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
-                                      #], name="model")]
+             skopt.space.Categorical([0.0, 0.1, 0.9, 0.99], name="reduce_lr")]
+    # skopt.space.Categorical([True, False], name="change_num_classes"),
+    # skopt.space.Categorical([#"COCO-Detection/retinanet_R_50_FPN_1x.yaml",
+    # "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
+    # "COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml",
+    # "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+    # ], name="model")]
     return space
 
 
@@ -159,23 +172,24 @@ def set_cfg_values(cfg, values):
     if "lr_scheduler" in values:
         cfg.SOLVER.LR_SCHEDULER_NAME = values["lr_scheduler"]
     if "warmup_fraction" in values:
-        if values["warmup_fraction"] != 0.:
+        if values["warmup_fraction"] != 0.0:
             cfg.SOLVER.WARMUP_ITERS = int(cfg.SOLVER.MAX_ITER * values["warmup_fraction"])
             cfg.SOLVER.WARMUP_FACTOR = 1. / float(cfg.SOLVER.WARMUP_ITERS)
         else:
             cfg.SOLVER.WARMUP_ITERS = 0
-            cfg.SOLVER.WARMUP_FACTOR = 1.
+            cfg.SOLVER.WARMUP_FACTOR = 1.0
     if "reduce_lr" in values:
-        if values["reduce_lr"] != 0.:
+        if values["reduce_lr"] != 0.0:
             if values["reduce_lr"] == 0.1:
                 cfg.SOLVER.STEPS = [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in [0.75]]
             else:
                 start_step = 1 - values["reduce_lr"]
-                cfg.SOLVER.STEPS = [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in np.arange(start_step, 1, start_step)]
+                cfg.SOLVER.STEPS = [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in
+                                    np.arange(start_step, 1, start_step)]
             cfg.SOLVER.GAMMA = values["reduce_lr"]
         else:
             cfg.SOLVER.STEPS = (1,)
-            cfg.SOLVER.GAMMA = 1.
+            cfg.SOLVER.GAMMA = 1.0
 
     if "clip_gradients" in values:
         if values["clip_gradients"]:
@@ -195,7 +209,7 @@ def set_cfg_values(cfg, values):
         cfg.INPUT.MIN_SIZE_TRAIN = values["scales"]
         cfg.INPUT.MIN_SIZE_TEST = cfg.INPUT.MIN_SIZE_TRAIN[-1]
     if "random_crop" in values:
-        cfg.INPUT.CROP.ENABLED = True if values["random_crop"] != 1. else False
+        cfg.INPUT.CROP.ENABLED = True if values["random_crop"] != 1.0 else False
         cfg.INPUT.CROP.SIZE = [values["random_crop"], values["random_crop"]]
     if "rotate" in values:
         cfg.ROTATE = values["rotate"] if values["batch_size"] <= 4 else False
@@ -203,25 +217,25 @@ def set_cfg_values(cfg, values):
     if "random_types" in values:
         cfg.RANDOM_TYPES = values["random_types"]
     if "photometric" in values:
-        if values["photometric"] <= 1.:
+        if values["photometric"] <= 1.0:
             max_val = values["photometric"]
-            cfg.PHOTOMETRIC = [[0., max_val], [0., max_val], [0., max_val], [0., max_val]] if values["photometric"] else []
+            cfg.PHOTOMETRIC = [max_val, max_val, max_val, max_val] if values["photometric"] else []
             if "photometric_types" in values:
                 cfg.PHOTOMETRIC_TYPES = values["photometric_types"]
     if "noise" in values:
-        if values["noise"] <= 1.:
-            cfg.NOISE = [0., values["noise"]] if values["noise"] else []
+        if values["noise"] <= 1.0:
+            cfg.NOISE = [0.0, values["noise"]] if values["noise"] else []
     if "cam_noise" in values:
-        if values["cam_noise"] <= .5:
-            cfg.CAM_NOISE = [0., values["cam_noise"]] if values["cam_noise"] else []
+        if values["cam_noise"] <= 0.5:
+            cfg.CAM_NOISE = [0.0, values["cam_noise"]] if values["cam_noise"] else []
             cfg.CAM_NOISE_SHIFT = (0.01, 0.05)
     if "motion_blur" in values:
-        if values["motion_blur"] <= .5:
+        if values["motion_blur"] <= 0.5:
             cfg.MOTION_BLUR = values["motion_blur"]
     if "gaussian_blur" in values:
         cfg.GAUSSIAN_BLUR = values["gaussian_blur"]
     if "cutout" in values:
-        if values["cutout"] <= 1.:
+        if values["cutout"] <= 1.0:
             cfg.CUTOUT = values["cutout"]
             if "cutout_sizes" in values:
                 cfg.CUTOUT_SIZES = [values["cutout_sizes"],
@@ -229,35 +243,35 @@ def set_cfg_values(cfg, values):
                                     None,
                                     None] if cfg.CUTOUT else []
     if "sharpen" in values:
-        if values["sharpen"] <= 1.:
+        if values["sharpen"] <= 1.0:
             cfg.SHARPEN = values["sharpen"]
             cfg.SHARPEN_RANGE = (0., values["sharpen"])
     if "clahe" in values:
-        if values["clahe"] <= 1.:
+        if values["clahe"] <= 1.0:
             cfg.CLAHE = values["clahe"]
     if "channel_dropout" in values:
-        if values["channel_dropout"] <= 1.:
+        if values["channel_dropout"] <= 1.0:
             cfg.CHANNEL_DROPOUT = values["channel_dropout"]
     if "grayscale" in values:
-        if values["grayscale"] <= 1.:
+        if values["grayscale"] <= 1.0:
             cfg.GRAYSCALE = values["grayscale"]
     if "vignette" in values:
-        cfg.VIGNETTE = (0., 0.8) if values["vignette"] else 0.
+        cfg.VIGNETTE = (0.0, 0.8) if values["vignette"] else 0.0
     if "chromatic" in values:
-        cfg.CHROMATIC_ABERRATION = (0., .5) if values["chromatic"] else 0.
+        cfg.CHROMATIC_ABERRATION = (0.0, 0.5) if values["chromatic"] else 0.0
     if "denoise" in values:
         cfg.DENOISE = values["denoise"]
     if "interp" in values:
         cfg.INTERP = values["interp"]
     if "hist_fda" in values:
-        if 1. < values["hist_fda"] <= 2.:
-            cfg.HISTOGRAM = [0., values["hist_fda"] - 1.]
-            cfg.FDA = 0.
-        elif 2. < values["hist_fda"] <= 3.:
-            cfg.FDA = values["hist_fda"] - 2.
+        if 1.0 < values["hist_fda"] <= 2.0:
+            cfg.HISTOGRAM = [0.0, values["hist_fda"] - 1.0]
+            cfg.FDA = 0.0
+        elif 2.0 < values["hist_fda"] <= 3.0:
+            cfg.FDA = values["hist_fda"] - 2.0
             cfg.HISTOGRAM = []
         else:
             cfg.HISTOGRAM = []
             cfg.FDA = []
     if "invert" in values:
-        cfg.INVERT = values["invert"] if values["invert"] else 0.
+        cfg.INVERT = values["invert"] if values["invert"] else 0.0

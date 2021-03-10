@@ -9,8 +9,9 @@ from utils import get_space, get_param_names, set_cfg_values, parse_data
 from justin import set_all_seeds, load_datasets, build_config, train_eval
 
 
-def main(seed):
-    set_all_seeds(seed)
+def main(seed=None):
+    if seed is not None:
+        set_all_seeds(seed)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--data", type=str, nargs='+', help="List of datasets used for training.")
@@ -60,22 +61,32 @@ def main(seed):
 
     res = skopt.dummy_minimize(func=objective, dimensions=space, n_calls=args.calls, random_state=seed, verbose=True)
     res_sorted = np.concatenate([np.expand_dims(100. - res.func_vals, axis=1), res.x_iters], axis=1)
+    table_values = res_sorted[res_sorted[:, 0].argsort()[::-1]]
+    table_headers = ["AP"] + get_param_names(space)
     print()
-    print(tabulate.tabulate(res_sorted[res_sorted[:, 0].argsort()[::-1]], headers=["AP"] + get_param_names(space)))
+    print("SEED:", seed)
+    print(tabulate.tabulate(table_values, headers=table_headers))
+
+    if args.data in ['best', 'all']:
+        results_filename = f"hyperopt_{args.model}_{args.data}_{seed}.txt"
+    else:
+        results_filename = f"hyperopt_{args.model}_{train_datasets[0] if len(train_datasets) == 1 else '_'.join(train_datasets)}_{seed}.txt"
+    with open(os.path.join(output_dir, results_filename), 'w') as f:
+        f.write(tabulate.tabulate(table_values, headers=table_headers))
 
     try:
-        skopt.dump(res, os.path.join(output_dir, "skopt_results.pkl"))
+        skopt.dump(res, results_filename.replace('txt', 'pkl'))
     except:
         print("Trying to store the result without the objective.")
-        skopt.dump(res, os.path.join(output_dir, "skopt_results.pkl"), store_objective=False)
+        skopt.dump(res, results_filename.replace('txt', 'pkl'), store_objective=False)
     finally:
         print("Deleting the objective.")
         del res.specs['args']['func']
-        skopt.dump(res, os.path.join(output_dir, "skopt_results.pkl"))
+        skopt.dump(res, results_filename.replace('txt', 'pkl'))
 
 
 if __name__ == "__main__":
-    main(seed=1234)
+    main(seed=np.random.randint(2 ** 31 - 1))
 
 """
       AP    learning_rate    batch_size    weight_decay  lr_scheduler         warmup_fraction  clip_gradients      clip_value  clip_type      norm_type    reduce_lr
