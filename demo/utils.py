@@ -91,7 +91,8 @@ def parse_data(data: list, dataset_names: list):
 def get_space():
     space = [skopt.space.Real(1e-6, 1e-4, name="learning_rate", prior='log-uniform'),
              skopt.space.Categorical([True, False], name="random_data"),
-             skopt.space.Categorical([1, 2, 3], name="epochs"),
+             skopt.space.Categorical([1, 2, 3, 5], name="epochs"),
+             skopt.space.Categorical([2, 4, 8], name="batch_size"),
              skopt.space.Categorical(["coco", "imagenet", "none"], name="weights"),
              skopt.space.Real(0.0, 2.0, name="photometric"),
              skopt.space.Categorical([True, False], name="random_types"),
