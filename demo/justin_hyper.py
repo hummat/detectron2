@@ -43,8 +43,9 @@ def main(seed=None):
 
     @skopt.utils.use_named_args(dimensions=space)
     def objective(**params):
-        if "random_data" in params and len(train_datasets) > 1:
-            train_ds = random.sample(train_datasets, random.randint(1, len(train_datasets)))
+        if "random_data" in params:
+            if params["random_data"] and len(train_datasets) > 1:
+                train_ds = random.sample(train_datasets, random.randint(1, len(train_datasets)))
         else:
             train_ds = train_datasets
         if "batch_size" in params:

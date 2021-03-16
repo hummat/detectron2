@@ -87,8 +87,7 @@ class Mosaic(Augmentation):
     def get_transform(self, image):
         img = image.copy().astype(float)[:, :, ::-1] / 255.
         cfa = mosaicing_CFA_Bayer(img, self.pattern)
-        img = np.clip(as_float_array(cctf_encoding(demosaicing_CFA_Bayer_bilinear(cfa, self.pattern))), 0, 1)[:, :,
-              ::-1]
+        img = np.clip(as_float_array(cctf_encoding(demosaicing_CFA_Bayer_bilinear(cfa, self.pattern))), 0, 1)[:, :, ::-1]
         return ReturnTransform(image=(img * 255.).astype(np.uint8))
 
 
@@ -864,7 +863,7 @@ def build_config(train_datasets, base_config, output_dir, batch_size: int = 4, e
     cfg.MOTION_BLUR = 0.
     cfg.GAUSSIAN_BLUR = 0.
     cfg.KERNEL_SIZE = 11
-    cfg.FLIP = "both"
+    cfg.FLIP = "both"  # TODO: Test vertical flip only
     cfg.INVERT = 0.
     cfg.GRAYSCALE = 0.
     cfg.CHANNEL_DROPOUT = 0.
