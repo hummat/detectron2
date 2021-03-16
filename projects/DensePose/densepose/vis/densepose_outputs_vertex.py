@@ -142,7 +142,7 @@ class DensePoseOutputsVertexVisualizer(object):
         return closest_vertices, mask
 
 
-def get_texture_atlases(json_str: Optional[str]) -> Dict[str, np.ndarray]:
+def get_texture_atlases(json_str: Optional[str]) -> Optional[Dict[str, Optional[np.ndarray]]]:
     """
     json_str is a JSON string representing a mesh_name -> texture_atlas_path dictionary
     """

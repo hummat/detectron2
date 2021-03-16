@@ -3,7 +3,7 @@
 import logging
 import os
 from collections import OrderedDict
-from typing import List, Optional
+from typing import List, Optional, Union
 import torch
 from torch import nn
 
@@ -76,19 +76,24 @@ class Trainer(DefaultTrainer):
     def extract_embedder_from_model(cls, model: nn.Module) -> Optional[Embedder]:
         if isinstance(model, nn.parallel.DistributedDataParallel):
             model = model.module
-        if hasattr(model, "roi_heads") and hasattr(model.roi_heads, "embedder"):
+        if hasattr(model, "roi_heads") and hasattr(model.roi_heads, "embedder"):  # pyre-ignore[16]
             return model.roi_heads.embedder
         return None
 
     # TODO: the only reason to copy the base class code here is to pass the embedder from
     # the model to the evaluator; that should be refactored to avoid unnecessary copy-pasting
     @classmethod
-    def test(cls, cfg: CfgNode, model: nn.Module, evaluators: List[DatasetEvaluator] = None):
+    def test(
+        cls,
+        cfg: CfgNode,
+        model: nn.Module,
+        evaluators: Optional[Union[DatasetEvaluator, List[DatasetEvaluator]]] = None,
+    ):
         """
         Args:
             cfg (CfgNode):
             model (nn.Module):
-            evaluators (list[DatasetEvaluator] or None): if None, will call
+            evaluators (DatasetEvaluator, list[DatasetEvaluator] or None): if None, will call
                 :meth:`build_evaluator`. Otherwise, must have the same length as
                 ``cfg.DATASETS.TEST``.
 
@@ -142,7 +147,7 @@ class Trainer(DefaultTrainer):
         cfg: CfgNode,
         dataset_name: str,
         output_folder: Optional[str] = None,
-        embedder: Embedder = None,
+        embedder: Optional[Embedder] = None,
     ) -> DatasetEvaluators:
         if output_folder is None:
             output_folder = os.path.join(cfg.OUTPUT_DIR, "inference")
@@ -164,6 +169,7 @@ class Trainer(DefaultTrainer):
                     True,
                     output_folder,
                     evaluator_type=cfg.DENSEPOSE_EVALUATION.TYPE,
+                    min_iou_threshold=cfg.DENSEPOSE_EVALUATION.MIN_IOU_THRESHOLD,
                     storage=storage,
                     embedder=embedder,
                 )
@@ -236,6 +242,6 @@ class Trainer(DefaultTrainer):
             )
             for name in cfg.DATASETS.TEST
         ]
-        res = cls.test(cfg, model, evaluators)
+        res = cls.test(cfg, model, evaluators)  # pyre-ignore[6]
         res = OrderedDict({k + "_TTA": v for k, v in res.items()})
         return res

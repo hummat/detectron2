@@ -1,5 +1,6 @@
 # -*- coding = utf-8 -*-
 # Copyright (c) Facebook, Inc. and its affiliates.
+# pyre-ignore-all-errors
 
 from detectron2.config import CfgNode as CN
 
@@ -35,6 +36,9 @@ def add_evaluation_config(cfg: CN):
     #            the least memory intensive, but may create bottlenecks
     #            on file system accesses
     _C.DENSEPOSE_EVALUATION.STORAGE = "none"
+    # minimum threshold for IOU values: the lower its values is,
+    # the more matches are produced (and the higher the AP score)
+    _C.DENSEPOSE_EVALUATION.MIN_IOU_THRESHOLD = 0.5
 
 
 def add_bootstrap_config(cfg: CN):

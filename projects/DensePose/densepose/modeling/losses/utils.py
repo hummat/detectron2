@@ -148,7 +148,7 @@ class BilinearInterpolationHelper:
             y_hi,
             x_lo,
             x_hi,
-            w_ylo_xlo,
+            w_ylo_xlo,  # pyre-ignore[6]
             w_ylo_xhi,
             w_yhi_xlo,
             w_yhi_xhi,
@@ -351,7 +351,7 @@ class ChartBasedAnnotationsAccumulator(AnnotationsAccumulator):
             boxes_xywh_est, boxes_xywh_gt, instances_one_image.gt_densepose
         ):
             if (dp_gt is not None) and (len(dp_gt.x) > 0):
-                self._do_accumulate(box_xywh_gt, box_xywh_est, dp_gt)
+                self._do_accumulate(box_xywh_gt, box_xywh_est, dp_gt)  # pyre-ignore[6]
             self.nxt_bbox_index += 1
 
     def _do_accumulate(

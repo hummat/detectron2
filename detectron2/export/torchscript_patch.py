@@ -52,7 +52,7 @@ def patch_instances(fields):
     """
     A contextmanager, under which the Instances class in detectron2 is replaced
     by a statically-typed scriptable class, defined by `fields`.
-    See more in `export_torchscript_with_instances`.
+    See more in `scripting_with_instances`.
     """
 
     with tempfile.TemporaryDirectory(prefix="detectron2") as dir, tempfile.NamedTemporaryFile(
@@ -323,6 +323,8 @@ def patch_nonscriptable_classes():
     from detectron2.modeling.roi_heads import StandardROIHeads
 
     if hasattr(StandardROIHeads, "__annotations__"):
+        # copy first to avoid editing annotations of base class
+        StandardROIHeads.__annotations__ = deepcopy(StandardROIHeads.__annotations__)
         StandardROIHeads.__annotations__["mask_on"] = torch.jit.Final[bool]
         StandardROIHeads.__annotations__["keypoint_on"] = torch.jit.Final[bool]
 

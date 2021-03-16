@@ -13,7 +13,7 @@ from detectron2.utils.file_io import PathManager
 from ..utils import maybe_prepend_base_path
 from .frame_selector import FrameSelector, FrameTsList
 
-FrameList = List[av.frame.Frame]
+FrameList = List[av.frame.Frame]  # pyre-ignore[16]
 FrameTransform = Callable[[torch.Tensor], torch.Tensor]
 
 
@@ -94,7 +94,7 @@ def list_keyframes(video_fpath: str, video_stream_idx: int = 0) -> FrameTsList:
 
 def read_keyframes(
     video_fpath: str, keyframes: FrameTsList, video_stream_idx: int = 0
-) -> FrameList:
+) -> FrameList:  # pyre-ignore[11]
     """
     Reads keyframe data from a video file.
 
@@ -167,7 +167,7 @@ def video_list_from_file(video_list_fpath: str, base_path: Optional[str] = None)
     video_list = []
     with PathManager.open(video_list_fpath, "r") as io:
         for line in io:
-            video_list.append(maybe_prepend_base_path(base_path, line.strip()))
+            video_list.append(maybe_prepend_base_path(base_path, str(line.strip())))
     return video_list
 
 
@@ -218,14 +218,14 @@ class VideoKeyframeDataset(Dataset):
         if not keyframes:
             return self._EMPTY_FRAMES
         if self.frame_selector is not None:
-            keyframes = self.frame_selector(keyframes)
+            keyframes = self.frame_selector(keyframes)  # pyre-ignore[29]
         frames = read_keyframes(fpath, keyframes)
         if not frames:
             return self._EMPTY_FRAMES
         frames = np.stack([frame.to_rgb().to_ndarray() for frame in frames])
         frames = torch.as_tensor(frames, device=torch.device("cpu"))
         if self.transform is not None:
-            frames = self.transform(frames)
+            frames = self.transform(frames)  # pyre-ignore[29]
         return frames
 
     def __len__(self):

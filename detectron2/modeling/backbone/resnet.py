@@ -386,6 +386,14 @@ class ResNet(Backbone):
         self._out_feature_channels = {"stem": self.stem.out_channels}
 
         self.stage_names, self.stages = [], []
+
+        if out_features is not None:
+            # Avoid keeping unused layers in this module. They consume extra memory
+            # and may cause allreduce to fail
+            num_stages = max(
+                [{"res2": 1, "res3": 2, "res4": 3, "res5": 4}.get(f, 0) for f in out_features]
+            )
+            stages = stages[:num_stages]
         for i, blocks in enumerate(stages):
             assert len(blocks) > 0, len(blocks)
             for block in blocks:
@@ -499,7 +507,7 @@ class ResNet(Backbone):
                 in the stage.
 
         Returns:
-            list[nn.Module]: a list of block module.
+            list[CNNBlockBase]: a list of block module.
 
         Examples:
         ::
@@ -534,6 +542,58 @@ class ResNet(Backbone):
             )
             in_channels = out_channels
         return blocks
+
+    @staticmethod
+    def make_default_stages(depth, block_class=None, **kwargs):
+        """
+        Created list of ResNet stages from pre-defined depth (one of 18, 34, 50, 101, 152).
+        If it doesn't create the ResNet variant you need, please use :meth:`make_stage`
+        instead for fine-grained customization.
+
+        Args:
+            depth (int): depth of ResNet
+            block_class (type): the CNN block class. Has to accept
+                `bottleneck_channels` argument for depth > 50.
+                By default it is BasicBlock or BottleneckBlock, based on the
+                depth.
+            kwargs:
+                other arguments to pass to `make_stage`. Should not contain
+                stride and channels, as they are predefined for each depth.
+
+        Returns:
+            list[list[CNNBlockBase]]: modules in all stages; see arguments of
+                :class:`ResNet.__init__`.
+        """
+        num_blocks_per_stage = {
+            18: [2, 2, 2, 2],
+            34: [3, 4, 6, 3],
+            50: [3, 4, 6, 3],
+            101: [3, 4, 23, 3],
+            152: [3, 8, 36, 3],
+        }[depth]
+        if block_class is None:
+            block_class = BasicBlock if depth < 50 else BottleneckBlock
+        if depth < 50:
+            in_channels = [64, 64, 128, 256]
+            out_channels = [64, 128, 256, 512]
+        else:
+            in_channels = [64, 256, 512, 1024]
+            out_channels = [256, 512, 1024, 2048]
+        ret = []
+        for (n, s, i, o) in zip(num_blocks_per_stage, [1, 2, 2, 2], in_channels, out_channels):
+            if depth >= 50:
+                kwargs["bottleneck_channels"] = o // 4
+            ret.append(
+                ResNet.make_stage(
+                    block_class=block_class,
+                    num_blocks=n,
+                    stride_per_block=[s] + [1] * (n - 1),
+                    in_channels=i,
+                    out_channels=o,
+                    **kwargs,
+                )
+            )
+        return ret
 
 
 ResNetBlockBase = CNNBlockBase
@@ -600,13 +660,7 @@ def build_resnet_backbone(cfg, input_shape):
 
     stages = []
 
-    # Avoid creating variables without gradients
-    # It consumes extra memory and may cause allreduce to fail
-    out_stage_idx = [
-        {"res2": 2, "res3": 3, "res4": 4, "res5": 5}[f] for f in out_features if f != "stem"
-    ]
-    max_stage_idx = max(out_stage_idx)
-    for idx, stage_idx in enumerate(range(2, max_stage_idx + 1)):
+    for idx, stage_idx in enumerate(range(2, 6)):
         # res5_dilation is used this way as a convention in R-FCN & Deformable Conv paper
         dilation = res5_dilation if stage_idx == 5 else 1
         first_stride = 1 if idx == 0 or (stage_idx == 5 and dilation == 2) else 2
