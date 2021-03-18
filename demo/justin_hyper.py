@@ -102,6 +102,18 @@ def main(seed=None):
 if __name__ == "__main__":
     main(seed=np.random.randint(2 ** 31 - 1))
 
+"""SEED: 1330231260 | data: case_new_cam_tless_new, case_image, case_room
+      AP    learning_rate  random_data      epochs    batch_size  weights      photometric  random_types    cam_noise    noise      motion_blur     cutout    cutout_sizes     sharpen      clahe    channel_dropout     invert       hist  vignette    chromatic      warmup_fraction    reduce_lr
+--------  ---------------  -------------  --------  ------------  ---------  -------------  --------------  -----------  -------  -------------  ---------  --------------  ----------  ---------  -----------------  ---------  ---------  ----------  -----------  -----------------  -----------
+59.6911       3.64182e-05  False                 5            16  none         1.34933      True            True         True         0.35648    0.349892               10  0.899466    1.9614            1.34076     1.17482    0.907061   False       True                       0           0.9
+"""
+
+"""SEED: 466711279 | data: case_new_cam_tless_new, case_image, case_room, case_no_alpha, case_still
+      AP    learning_rate  random_data      epochs    batch_size  weights      photometric  random_types    cam_noise    noise      motion_blur     cutout    cutout_sizes     sharpen       clahe    channel_dropout     invert        hist  vignette    chromatic      warmup_fraction    reduce_lr
+--------  ---------------  -------------  --------  ------------  ---------  -------------  --------------  -----------  -------  -------------  ---------  --------------  ----------  ----------  -----------------  ---------  ----------  ----------  -----------  -----------------  -----------
+58.932        7.81261e-05  False                 3             2  none          1.57246     False           False        True        0.692054    1.29552               200  0.411191    1.44028           0.0204539    1.3208     0.38159     False       False                      0.3         0.99
+"""
+
 """
       AP    learning_rate    photometric  random_types    photometric_types                                       cam_noise    motion_blur    cutout    cutout_sizes    sharpen     clahe    channel_dropout    grayscale     invert    hist_fda  vignette    chromatic      weight_decay    warmup_fraction  clip_gradients      reduce_lr
 --------  ---------------  -------------  --------------  ----------------------------------------------------  -----------  -------------  --------  --------------  ---------  --------  -----------------  -----------  ---------  ----------  ----------  -----------  --------------  -----------------  ----------------  -----------
