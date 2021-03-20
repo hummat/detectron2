@@ -1,13 +1,12 @@
+import numpy as np
+import tabulate
+
+import argparse
 import os
 import random
-
 import skopt
-import tabulate
-import numpy as np
-import argparse
-
-from utils import get_space, get_param_names, set_cfg_values, parse_data
-from justin import set_all_seeds, load_datasets, build_config, train_eval
+from justin import build_config, load_datasets, set_all_seeds, train_eval
+from utils import get_param_names, get_space, parse_data, set_cfg_values
 
 
 def main(seed=None):
@@ -15,15 +14,30 @@ def main(seed=None):
         set_all_seeds(seed)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--data", type=str, nargs='+', help="List of datasets used for training.")
-    parser.add_argument("--path_prefix", default="/home/matthias/Data/Ubuntu/data", type=str)
+    parser.add_argument("-d",
+                        "--data",
+                        type=str,
+                        nargs='+',
+                        help="List of datasets used for training.")
+    parser.add_argument("--path_prefix",
+                        default="/home/matthias/Data/Ubuntu/data",
+                        type=str)
     parser.add_argument("--train_dir", default="datasets/case", type=str)
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
     parser.add_argument("--model", default="retinanet", type=str)
-    parser.add_argument("--batch_size", default=4, type=int, help="Batch size used during training.")
-    parser.add_argument("--epochs", default=2.0, type=float, help="(Fraction of) epochs to train.")
-    parser.add_argument("--calls", default=50, type=int, help="Number of hyperparameter search evaluations.")
+    parser.add_argument("--batch_size",
+                        default=4,
+                        type=int,
+                        help="Batch size used during training.")
+    parser.add_argument("--epochs",
+                        default=2.0,
+                        type=float,
+                        help="(Fraction of) epochs to train.")
+    parser.add_argument("--calls",
+                        default=50,
+                        type=int,
+                        help="Number of hyperparameter search evaluations.")
     args = parser.parse_args()
 
     train_root = os.path.join(args.path_prefix, args.train_dir)
@@ -45,7 +59,8 @@ def main(seed=None):
     def objective(**params):
         if "random_data" in params:
             if params["random_data"] and len(train_datasets) > 1:
-                train_ds = random.sample(train_datasets, random.randint(1, len(train_datasets)))
+                train_ds = random.sample(train_datasets,
+                                         random.randint(1, len(train_datasets)))
         else:
             train_ds = train_datasets
         if "batch_size" in params:
@@ -56,9 +71,12 @@ def main(seed=None):
             epochs = params["epochs"]
         else:
             epochs = args.epochs
-        cfg = build_config(train_ds, base_config, output_dir, batch_size, epochs)
+        cfg = build_config(train_ds, base_config, output_dir, batch_size,
+                           epochs)
         set_cfg_values(cfg, params)
-        print(tabulate.tabulate(np.expand_dims(list(params.values()), axis=0), headers=list(params.keys())))
+        print(
+            tabulate.tabulate(np.expand_dims(list(params.values()), axis=0),
+                              headers=list(params.keys())))
         try:
             ap, it = train_eval(cfg)
             if np.any(np.isnan(ap)):
@@ -73,8 +91,13 @@ def main(seed=None):
         print("AP:", ap)
         return 100. if np.isnan(ap) else 100. - ap
 
-    res = skopt.dummy_minimize(func=objective, dimensions=space, n_calls=args.calls, random_state=seed, verbose=True)
-    res_sorted = np.concatenate([np.expand_dims(100. - res.func_vals, axis=1), res.x_iters], axis=1)
+    res = skopt.dummy_minimize(func=objective,
+                               dimensions=space,
+                               n_calls=args.calls,
+                               random_state=seed,
+                               verbose=True)
+    res_sorted = np.concatenate(
+        [np.expand_dims(100. - res.func_vals, axis=1), res.x_iters], axis=1)
     table_values = res_sorted[res_sorted[:, 0].argsort()[::-1]]
     table_headers = ["AP"] + get_param_names(space)
     print()
@@ -92,7 +115,9 @@ def main(seed=None):
         skopt.dump(res, results_filename.replace('txt', 'pkl'))
     except:
         print("Trying to store the result without the objective.")
-        skopt.dump(res, results_filename.replace('txt', 'pkl'), store_objective=False)
+        skopt.dump(res,
+                   results_filename.replace('txt', 'pkl'),
+                   store_objective=False)
     finally:
         print("Deleting the objective.")
         del res.specs['args']['func']
@@ -100,20 +125,17 @@ def main(seed=None):
 
 
 if __name__ == "__main__":
-    main(seed=np.random.randint(2 ** 31 - 1))
-
+    main(seed=np.random.randint(2**31 - 1))
 """SEED: 1330231260 | data: case_new_cam_tless_new, case_image, case_room
       AP    learning_rate  random_data      epochs    batch_size  weights      photometric  random_types    cam_noise    noise      motion_blur     cutout    cutout_sizes     sharpen      clahe    channel_dropout     invert       hist  vignette    chromatic      warmup_fraction    reduce_lr
 --------  ---------------  -------------  --------  ------------  ---------  -------------  --------------  -----------  -------  -------------  ---------  --------------  ----------  ---------  -----------------  ---------  ---------  ----------  -----------  -----------------  -----------
 59.6911       3.64182e-05  False                 5            16  none         1.34933      True            True         True         0.35648    0.349892               10  0.899466    1.9614            1.34076     1.17482    0.907061   False       True                       0           0.9
 """
-
 """SEED: 466711279 | data: case_new_cam_tless_new, case_image, case_room, case_no_alpha, case_still
       AP    learning_rate  random_data      epochs    batch_size  weights      photometric  random_types    cam_noise    noise      motion_blur     cutout    cutout_sizes     sharpen       clahe    channel_dropout     invert        hist  vignette    chromatic      warmup_fraction    reduce_lr
 --------  ---------------  -------------  --------  ------------  ---------  -------------  --------------  -----------  -------  -------------  ---------  --------------  ----------  ----------  -----------------  ---------  ----------  ----------  -----------  -----------------  -----------
 58.932        7.81261e-05  False                 3             2  none          1.57246     False           False        True        0.692054    1.29552               200  0.411191    1.44028           0.0204539    1.3208     0.38159     False       False                      0.3         0.99
 """
-
 """
       AP    learning_rate    photometric  random_types    photometric_types                                       cam_noise    motion_blur    cutout    cutout_sizes    sharpen     clahe    channel_dropout    grayscale     invert    hist_fda  vignette    chromatic      weight_decay    warmup_fraction  clip_gradients      reduce_lr
 --------  ---------------  -------------  --------------  ----------------------------------------------------  -----------  -------------  --------  --------------  ---------  --------  -----------------  -----------  ---------  ----------  ----------  -----------  --------------  -----------------  ----------------  -----------
@@ -122,7 +144,6 @@ if __name__ == "__main__":
 45.6293       0.000290654      1.31423    True            ('contrast',)                                           0.31747        0.440812   0.90653               100  1.15749    1.03711          0.429949       1.77727    0.421703    1.84105    False       False           1.18207e-14                0.2  False                    0.99
 45.0714       6.38393e-05      1.36208    True            ('brightness',)                                         0.0544735      0.390955   0.844674              100  0.0418989  0.527211           1.85124      1.06547    1.17996      2.08706   True        True            4.27169e-13                0.1  False                    0.9
 """
-
 """
       AP    learning_rate    batch_size    weight_decay  lr_scheduler         warmup_fraction  clip_gradients      clip_value  clip_type      norm_type    reduce_lr
 --------  ---------------  ------------  --------------  -----------------  -----------------  ----------------  ------------  -----------  -----------  -----------
@@ -132,7 +153,6 @@ if __name__ == "__main__":
 45.5131       8.96462e-05             4     1.19641e-08  WarmupMultiStepLR                0    True                    0.005   norm                   2         0.99
 44.5976       0.000351911             4     1.25598e-15  WarmupMultiStepLR                0.3  True                    0.5     value                  1         0.1
 """
-
 """seed 13
       AP    learning_rate    batch_size  optimizer      weight_decay    momentum  lr_scheduler         warmup_fraction  clip_gradients      reduce_lr
 --------  ---------------  ------------  -----------  --------------  ----------  -----------------  -----------------  ----------------  -----------
@@ -187,7 +207,6 @@ if __name__ == "__main__":
  0            0.000178316             2  SGD             0.000325052        0.99  WarmupMultiStepLR                0.2  True                     0.9
  0            3.34331e-05             4  SGD             1.42461e-10        0.99  WarmupCosineLR                   0.1  True                     0.1
 """
-
 """seed 456
      AP    photometric    gaussian_blur      cutout    cutout_sizes    sharpen
 -------  -------------  ---------------  ----------  --------------  ---------
@@ -242,7 +261,6 @@ if __name__ == "__main__":
 24.0149      0.481738         0.0157863  0.40284                400  0.301869
 21.1582      0.348714         0.893581   0.753106               200  0.457822
 """
-
 """seed 568
      AP    photometric  random_types    photometric_types
 -------  -------------  --------------  ----------------------------------------------------
@@ -297,8 +315,6 @@ if __name__ == "__main__":
 20.7769      0.668497   False           ('contrast', 'lighting')
  0           0.266978   False           ('contrast', 'saturation')
 """
-
-
 """seed 345
      AP    photometric       noise    cam_noise    motion_blur    gaussian_blur     cutout    cutout_sizes    sharpen       clahe    channel_dropout    grayscale     invert    hist_fda    vignette    chromatic
 -------  -------------  ----------  -----------  -------------  ---------------  ---------  --------------  ---------  ----------  -----------------  -----------  ---------  ----------  ----------  -----------
@@ -353,8 +369,6 @@ if __name__ == "__main__":
 12.1703     0.182772    0.00931149    0.180983       0.129917        0.406136    0.302822               10  0.524993   0.919905            0.863932     0.641827   0.380998     0.627577           0            1
 12.1085     0.401018    0.0895861     0.403525       0.269877        0.304171    0.977037              200  0.0745726  0.0609651           0.493017     0.0653144  0.784286     2.01084            0            0
 """
-
-
 """seed 42
       AP    photometric       noise    cam_noise    motion_blur    gaussian_blur     cutout    cutout_sizes    sharpen      clahe    channel_dropout    grayscale     invert    hist_fda    vignette    chromatic    denoise    interp
 --------  -------------  ----------  -----------  -------------  ---------------  ---------  --------------  ---------  ---------  -----------------  -----------  ---------  ----------  ----------  -----------  ---------  --------
