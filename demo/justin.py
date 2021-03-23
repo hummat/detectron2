@@ -59,7 +59,7 @@ class ReturnTransform(Transform):
     def apply_image(self, img: np.ndarray) -> np.ndarray:
         return img if self.image is None else self.image
 
-    def apply_coords(self, coords):
+    def apply_coords(self, coords: np.ndarray) -> np.ndarray:
         return coords
 
     def apply_segmentation(self, segmentation):
@@ -861,6 +861,7 @@ def load_datasets(train_root, eval_root):
                                     os.path.join(path, "coco_annotations.json"),
                                     path)
         break
+    names.extend(["justin_val", "justin_test", "justin_train"])
     return names
 
 
@@ -1051,7 +1052,7 @@ def build_config(
     cfg.MOTION_BLUR = 0.0
     cfg.GAUSSIAN_BLUR = 0.0
     cfg.KERNEL_SIZE = 11
-    cfg.FLIP = "both"  # TODO: Test vertical flip only
+    cfg.FLIP = "horizontal"
     cfg.INVERT = 0.0
     cfg.GRAYSCALE = 0.0
     cfg.CHANNEL_DROPOUT = 0.0
