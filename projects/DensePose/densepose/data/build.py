@@ -16,6 +16,7 @@ from detectron2.data.build import (
     load_proposals_into_dataset,
     print_instances_class_histogram,
     trivial_batch_collator,
+    worker_init_reset_seed,
 )
 from detectron2.data.catalog import DatasetCatalog, Metadata, MetadataCatalog
 from detectron2.data.samplers import TrainingSampler
@@ -608,6 +609,7 @@ def build_inference_based_loader(
         sampler=training_sampler,
         num_workers=dataset_cfg.IMAGE_LOADER.NUM_WORKERS,
         collate_fn=trivial_batch_collator,
+        worker_init_fn=worker_init_reset_seed,
     )
     return InferenceBasedLoader(
         model,
@@ -649,7 +651,8 @@ def build_video_list_dataset(meta: Metadata, cfg: CfgNode):
         frame_selector = build_frame_selector(cfg.SELECT)
         transform = build_transform(cfg.TRANSFORM, data_type="image")
         video_list = video_list_from_file(video_list_fpath, video_base_path)
-        return VideoKeyframeDataset(video_list, frame_selector, transform)
+        keyframe_helper_fpath = cfg.KEYFRAME_HELPER if hasattr(cfg, "KEYFRAME_HELPER") else None
+        return VideoKeyframeDataset(video_list, frame_selector, transform, keyframe_helper_fpath)
 
 
 class _BootstrapDatasetFactoryCatalog(UserDict):
