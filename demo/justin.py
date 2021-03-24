@@ -32,6 +32,7 @@ import albumentations as A
 import argparse
 import csv
 import glob
+import logging
 import os
 import random
 import skopt
@@ -762,14 +763,14 @@ def visualize_results(predictor, dataset="", image_path=""):
             v = Visualizer(img[:, :, ::-1], metadata=metadata)
             out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
             cv2.imshow(str(d["image_id"]), out.get_image()[:, :, ::-1])
-            cv2.waitKey()
+            cv2.waitKey(0)
     elif image_path:
         img = cv2.imread(image_path)
         outputs = predictor(img[:, :, ::-1])
         v = Visualizer(img[:, :, ::-1])
         out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
         cv2.imshow(image_path, out.get_image()[:, :, ::-1])
-        cv2.waitKey()
+        cv2.waitKey(0)
 
 
 def visualize_data(cfg, data_loader):
@@ -813,6 +814,31 @@ def get_model(cfg):
     return model
 
 
+def path_to_weights(cfg, max_ap: float, it_at_max_ap: int) -> str:
+    dataset = cfg.DATASETS.TRAIN[0] if len(
+        cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
+    path = os.path.join(
+        cfg.OUTPUT_DIR,
+        f"{cfg.BASE_CONFIG.split('/')[-1].strip('.yaml')}_{dataset}_mAP{max_ap:.2f}@it{it_at_max_ap}.pth"
+    )
+    return path
+
+
+def find_best_weights(cfg) -> str:
+    model = cfg.BASE_CONFIG.split('/')[-1].strip('.yaml')
+    dataset = cfg.DATASETS.TRAIN[0] if len(cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
+    max_ap = 0
+    best_weights = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
+    for file_name in os.listdir(cfg.OUTPUT_DIR):
+        if file_name.lower().endswith("pth"):
+            if model in file_name and dataset in file_name:
+               ap = float(file_name.split("mAP")[1].split("@")[0])
+               if ap > max_ap:
+                   best_weights = file_name
+    logging.getLogger(name=__file__).info(f"Using {best_weights}")
+    return os.path.join(cfg.OUTPUT_DIR, best_weights)
+
+
 def train_eval(cfg, resume=False):
     trainer = Trainer(cfg)
     trainer.resume_or_load(resume)
@@ -821,6 +847,20 @@ def train_eval(cfg, resume=False):
     ap_it = np.array(trainer.storage.history(name="bbox/AP").values())
     ap = ap_it[:, 0]
     it = ap_it[:, 1]
+
+    it_at_max_ap = it[ap.argmax()].astype(int)
+    path = path_to_weights(cfg, ap.max(), it_at_max_ap)
+    all_checkpoints = trainer.checkpointer.get_all_checkpoint_files()
+    final_is_best = True
+    for chkpt in all_checkpoints:
+        if chkpt.split('_')[-1].strip(".pth").lstrip('0') == str(it_at_max_ap):
+            final_is_best = False
+            best_model = torch.load(chkpt)
+    if final_is_best:
+        best_model = torch.load(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))
+    logging.getLogger(name=__file__).info(f"Storing best model at {path}")
+    torch.save(best_model, path)
+
     del trainer
     torch.cuda.empty_cache()
     return ap, it
@@ -828,7 +868,7 @@ def train_eval(cfg, resume=False):
 
 def evaluate(cfg, model=None):
     if model is None:
-        cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
+        cfg.MODEL.WEIGHTS = find_best_weights(cfg)
         model = get_model(cfg).eval()
     evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], output_dir=cfg.OUTPUT_DIR)
     val_loader = build_detection_test_loader(
@@ -837,7 +877,11 @@ def evaluate(cfg, model=None):
 
 
 def predict(cfg, dataset="", image_path=""):
-    cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
+    cfg.MODEL.WEIGHTS = find_best_weights(cfg)
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.75
+    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
+    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.75
+    cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
     predictor = DefaultPredictor(cfg)
     if dataset:
         visualize_results(predictor, dataset=dataset)
@@ -971,6 +1015,7 @@ def build_config(
 ):
     cfg = get_cfg()
     cfg.merge_from_file(model_zoo.get_config_file(base_config))
+    cfg.BASE_CONFIG = base_config
 
     cfg.DATASETS.TRAIN = train_datasets
     cfg.DATASETS.TEST = ("justin_test",)
@@ -994,7 +1039,7 @@ def build_config(
 
     cfg.SOLVER.BASE_LR = 0.0001
     cfg.SOLVER.MAX_ITER = int(cfg.EPOCHS * cfg.NUM_BATCHES)
-    cfg.SOLVER.CHECKPOINT_PERIOD = cfg.NUM_BATCHES  # Checkpoint every epoch
+    cfg.SOLVER.CHECKPOINT_PERIOD = 10
     cfg.SOLVER.WEIGHT_DECAY = 0.0
     cfg.SOLVER.MOMENTUM = 0.9
     cfg.SOLVER.NESTEROV = False
@@ -1027,7 +1072,7 @@ def build_config(
     cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.05
     cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
 
-    cfg.TEST.EVAL_PERIOD = 100
+    cfg.TEST.EVAL_PERIOD = 10
     cfg.TEST.DETECTIONS_PER_IMAGE = 100
     cfg.MODEL.RETINANET.NUM_CLASSES = 1
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
@@ -1078,7 +1123,7 @@ def build_config(
     return cfg
 
 
-def main(seed: int = 42):
+def main(seed: int = 42) -> None:
     start = time.time()
     set_all_seeds(seed)
 
@@ -1179,9 +1224,11 @@ def main(seed: int = 42):
                         help="Visualize predictions.")
     args = parser.parse_args()
 
+    values = default_values
     if args.model == "retinanet":
         base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
-        values = default_values
+    elif args.model == "faster_rcnn":
+        base_config = "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
     elif args.model == "mask_rcnn":
         base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
         values = {

@@ -46,12 +46,14 @@ def main(seed=None):
 
     if args.model == "retinanet":
         base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
+    elif args.model == "faster_rcnn":
+        base_config = "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
     elif args.model == "mask_rcnn":
         base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
     else:
         base_config = args.model
-    output_dir = os.path.join(args.path_prefix, args.out_dir)
 
+    output_dir = os.path.join(args.path_prefix, args.out_dir)
     train_datasets = parse_data(args.data, dataset_names)
     space = get_space()
 
@@ -71,6 +73,15 @@ def main(seed=None):
             epochs = params["epochs"]
         else:
             epochs = args.epochs
+        if "model" in params:
+            if params["model"] == "retinanet":
+                base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
+            elif params["model"] == "faster_rcnn":
+                base_config = "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+            elif params["model"] == "mask_rcnn":
+                base_config = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
+            else:
+                base_config = params["model"]
         cfg = build_config(train_ds, base_config, output_dir, batch_size,
                            epochs)
         set_cfg_values(cfg, params)
