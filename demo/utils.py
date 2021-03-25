@@ -271,6 +271,7 @@ def get_param_names(**params) -> list:
 
 
 def set_cfg_values(cfg, values):
+    # Typecast to standard Python types if not already
     for k, v in values.items():
         try:
             values[k] = v.item()

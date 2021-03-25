@@ -814,7 +814,7 @@ def get_model(cfg):
     return model
 
 
-def path_to_weights(cfg, max_ap: float, it_at_max_ap: int) -> str:
+def path_to_checkpoint(cfg, max_ap: float, it_at_max_ap: int) -> str:
     dataset = cfg.DATASETS.TRAIN[0] if len(
         cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
     path = os.path.join(
@@ -824,17 +824,41 @@ def path_to_weights(cfg, max_ap: float, it_at_max_ap: int) -> str:
     return path
 
 
-def find_best_weights(cfg) -> str:
+def extract_ap(chkpt: str) -> float:
+    return float(chkpt.split("mAP")[1].split("@")[0])
+
+
+def is_best_checkpoint(cfg, chkpt: str) -> bool:
     model = cfg.BASE_CONFIG.split('/')[-1].strip('.yaml')
-    dataset = cfg.DATASETS.TRAIN[0] if len(cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
+    dataset = cfg.DATASETS.TRAIN[0] if len(
+        cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
+
+    # Find current maximum mAP
+    max_ap = 0
+    for file_name in os.listdir(cfg.OUTPUT_DIR):
+        if file_name.lower().endswith("pth"):
+            if model in file_name and dataset in file_name:
+                ap = extract_ap(file_name)
+                max_ap = ap if ap > max_ap else max_ap
+
+    # Compare to new mAP
+    return extract_ap(chkpt) > max_ap
+
+
+def find_best_checkpoint(cfg) -> str:
+    model = cfg.BASE_CONFIG.split('/')[-1].strip('.yaml')
+    dataset = cfg.DATASETS.TRAIN[0] if len(
+        cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
+
     max_ap = 0
     best_weights = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
     for file_name in os.listdir(cfg.OUTPUT_DIR):
         if file_name.lower().endswith("pth"):
             if model in file_name and dataset in file_name:
-               ap = float(file_name.split("mAP")[1].split("@")[0])
-               if ap > max_ap:
-                   best_weights = file_name
+                ap = extract_ap(file_name)
+                if ap > max_ap:
+                    best_weights = file_name
+
     logging.getLogger(name=__file__).info(f"Using {best_weights}")
     return os.path.join(cfg.OUTPUT_DIR, best_weights)
 
@@ -848,18 +872,15 @@ def train_eval(cfg, resume=False):
     ap = ap_it[:, 0]
     it = ap_it[:, 1]
 
+    # Store best checkpoint if better than previous
     it_at_max_ap = it[ap.argmax()].astype(int)
-    path = path_to_weights(cfg, ap.max(), it_at_max_ap)
     all_checkpoints = trainer.checkpointer.get_all_checkpoint_files()
-    final_is_best = True
     for chkpt in all_checkpoints:
         if chkpt.split('_')[-1].strip(".pth").lstrip('0') == str(it_at_max_ap):
-            final_is_best = False
-            best_model = torch.load(chkpt)
-    if final_is_best:
-        best_model = torch.load(os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))
-    logging.getLogger(name=__file__).info(f"Storing best model at {path}")
-    torch.save(best_model, path)
+            path = path_to_checkpoint(cfg, ap.max(), it_at_max_ap)
+            if is_best_checkpoint(cfg, path):
+                logging.getLogger(name=__file__).info(f"Storing best model at {path}")
+                torch.save(torch.load(chkpt), path)
 
     del trainer
     torch.cuda.empty_cache()
@@ -868,7 +889,7 @@ def train_eval(cfg, resume=False):
 
 def evaluate(cfg, model=None):
     if model is None:
-        cfg.MODEL.WEIGHTS = find_best_weights(cfg)
+        cfg.MODEL.WEIGHTS = find_best_checkpoint(cfg)
         model = get_model(cfg).eval()
     evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], output_dir=cfg.OUTPUT_DIR)
     val_loader = build_detection_test_loader(
@@ -877,7 +898,7 @@ def evaluate(cfg, model=None):
 
 
 def predict(cfg, dataset="", image_path=""):
-    cfg.MODEL.WEIGHTS = find_best_weights(cfg)
+    cfg.MODEL.WEIGHTS = find_best_checkpoint(cfg)
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.75
     cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
     cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.75
@@ -1072,7 +1093,7 @@ def build_config(
     cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.05
     cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
 
-    cfg.TEST.EVAL_PERIOD = cfg.SOLVER.CHECKPOINT_PERIO
+    cfg.TEST.EVAL_PERIOD = cfg.SOLVER.CHECKPOINT_PERIOD
     cfg.TEST.DETECTIONS_PER_IMAGE = 100
     cfg.MODEL.RETINANET.NUM_CLASSES = 1
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1

@@ -66,11 +66,11 @@ def main(seed=None):
         else:
             train_ds = train_datasets
         if "batch_size" in params:
-            batch_size = params["batch_size"]
+            batch_size = int(params["batch_size"])
         else:
             batch_size = args.batch_size
         if "epochs" in params:
-            epochs = params["epochs"]
+            epochs = int(params["epochs"])
         else:
             epochs = args.epochs
         if "model" in params:
@@ -102,11 +102,11 @@ def main(seed=None):
         print("AP:", ap)
         return 100. if np.isnan(ap) else 100. - ap
 
-    res = skopt.dummy_minimize(func=objective,
-                               dimensions=space,
-                               n_calls=args.calls,
-                               random_state=seed,
-                               verbose=True)
+    res = skopt.gp_minimize(func=objective,
+                            dimensions=space,
+                            n_calls=args.calls,
+                            random_state=seed,
+                            verbose=True)
     res_sorted = np.concatenate(
         [np.expand_dims(100. - res.func_vals, axis=1), res.x_iters], axis=1)
     table_values = res_sorted[res_sorted[:, 0].argsort()[::-1]]
