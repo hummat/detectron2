@@ -864,9 +864,14 @@ def find_best_checkpoint(cfg) -> str:
 
 
 def train_eval(cfg, resume=False):
-    trainer = Trainer(cfg)
-    trainer.resume_or_load(resume)
-    trainer.train()
+    try:
+        trainer = Trainer(cfg)
+        trainer.resume_or_load(resume)
+        trainer.train()
+    except:
+        del trainer
+        torch.cuda.empty_cache()
+        raise
 
     ap_it = np.array(trainer.storage.history(name="bbox/AP").values())
     ap = ap_it[:, 0]
