@@ -243,7 +243,7 @@ def get_space() -> list:
             [0.0, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
             name="weight_decay"),
         # skopt.space.Categorical([True, False], name="random_data"),
-        skopt.space.Categorical([1, 2, 3, 5], name="epochs"),
+        skopt.space.Categorical([1], name="epochs"),
         skopt.space.Categorical([2, 4, 8], name="batch_size"),
         skopt.space.Categorical(["coco", "imagenet", "none"], name="weights"),
         # skopt.space.Real(0.0, 2.0, name="photometric"),

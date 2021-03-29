@@ -7,7 +7,7 @@ import random
 import skopt
 import time
 from justin import build_config, load_datasets, set_all_seeds, train_eval
-from typing import Tuple, Union, Any
+from typing import Any, Tuple, Union
 from utils import get_param_names, get_space, parse_data, set_cfg_values
 
 
@@ -109,23 +109,30 @@ def main(seed=None):
             ap, it = train_eval(cfg)
             if np.any(np.isnan(ap)) or np.nanmax(ap) < 1.0:
                 if return_time:
-                    return 100.0, start - time.time()
+                    return 100.0, time.time() - start
                 else:
                     return 100.0
             result = np.vstack([ap, it]).T
             result = result[result[:, 0].argmax()]
         except:
             if return_time:
-                return 100.0, start - time.time()
+                return 100.0, time.time() - start
             else:
                 return 100.0
+
         ap = result[0]
 
-        print("AP:", ap, "time:", start - time.time())
+        if np.isnan(ap):
+            if return_time:
+                return 100.0, time.time() - start
+            else:
+                return 100.0
+
+        print("AP:", ap, "time:", time.time() - start)
         if return_time:
-            return 100.0, start - time.time()
+            return 100.0 - ap, time.time() - start
         else:
-            return 100.0
+            return 100.0 - ap
 
     if args.optimizer == "gp":
         res = skopt.gp_minimize(func=objective,
