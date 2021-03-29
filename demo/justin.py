@@ -879,7 +879,8 @@ def train_eval(cfg, resume=False):
         if chkpt.split('_')[-1].strip(".pth").lstrip('0') == str(it_at_max_ap):
             path = path_to_checkpoint(cfg, ap.max(), it_at_max_ap)
             if is_best_checkpoint(cfg, path):
-                logging.getLogger(name=__file__).info(f"Storing best model at {path}")
+                logging.getLogger(
+                    name=__file__).info(f"Storing best model at {path}")
                 torch.save(torch.load(chkpt), path)
 
     del trainer
@@ -1245,7 +1246,19 @@ def main(seed: int = 42) -> None:
                         help="Visualize predictions.")
     args = parser.parse_args()
 
-    values = default_values
+    values = {
+        "batch_size": args.batch_size,
+        "learning_rate": args.learning_rate,
+        "reduce_lr": args.reduce_lr,
+        "weight_decay": args.weight_decay,
+        "warmup_fraction": args.warmup_fraction,
+        "clip_gradients": args.clip_gradients,
+        "clip_value": args.clip_value,
+        "clip_type": args.clip_type,
+        "norm_type": args.norm_type,
+        "epochs": args.epochs
+    }
+
     if args.model == "retinanet":
         base_config = "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
     elif args.model == "faster_rcnn":
@@ -1267,18 +1280,8 @@ def main(seed: int = 42) -> None:
         }
     else:
         base_config = args.model
-        values = {
-            "learning_rate": args.learning_rate,
-            "reduce_lr": args.reduce_lr,
-            "weight_decay": args.weight_decay,
-            "warmup_fraction": args.warmup_fraction,
-            "clip_gradients": args.clip_gradients,
-            "clip_value": args.clip_value,
-            "clip_type": args.clip_type,
-            "norm_type": args.norm_type,
-        }
-    output_dir = os.path.join(args.path_prefix, args.out_dir)
 
+    output_dir = os.path.join(args.path_prefix, args.out_dir)
     train_root = os.path.join(args.path_prefix, args.train_dir)
     val_root = os.path.join(args.path_prefix, args.val_dir)
     dataset_names = load_datasets(train_root, val_root)

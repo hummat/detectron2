@@ -19,10 +19,10 @@ def get_results_dict() -> dict:
             56.66434772, 51.39635758, 45.88279167, 38.80435224, 33.65569984
         ],
         "case_front3d_v2": [
-            59.0415041, 56.01378549, 54.5582662, 51.2175725, 45.57333254
+            61.01553947, 55.58437218, 49.60603806, 49.53397071, 46.5568013
         ],
         "case_front3d": [
-            63.6688337, 53.53222694, 48.59676356, 48.50549171, 45.80506092
+            62.02147473, 53.78759735, 53.63398144, 44.57640408, 41.05447549
         ],
         "case_better_color": [
             52.97515493, 48.77915566, 47.3969108, 46.21510695, 37.15266009
@@ -238,9 +238,9 @@ def parse_data(data: list, dataset_names: list) -> list:
 
 def get_space() -> list:
     space = [
-        skopt.space.Real(1e-6, 1e-4, name="learning_rate", prior='log-uniform'),
+        skopt.space.Real(1e-6, 1e-3, name="learning_rate", prior='log-uniform'),
         skopt.space.Categorical(
-            [0.0, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4],
+            [0.0, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
             name="weight_decay"),
         # skopt.space.Categorical([True, False], name="random_data"),
         skopt.space.Categorical([1, 2, 3, 5], name="epochs"),
@@ -261,7 +261,7 @@ def get_space() -> list:
         # skopt.space.Categorical([True, False], name="vignette"),
         # skopt.space.Categorical([True, False], name="chromatic"),
         skopt.space.Categorical([0.0, 0.1, 0.2, 0.3], name="warmup_fraction"),
-        skopt.space.Categorical([0.0, 0.9, 0.99], name="reduce_lr"),
+        skopt.space.Categorical([0.0, 0.1, 0.9, 0.99], name="reduce_lr"),
         skopt.space.Categorical(["retinanet", "mask_rcnn", "faster_rcnn"],
                                 name="model")
     ]
@@ -301,7 +301,7 @@ def set_cfg_values(cfg, values):
         if values["reduce_lr"] != 0.0:
             if values["reduce_lr"] == 0.1:
                 cfg.SOLVER.STEPS = [
-                    int(fraction * cfg.SOLVER.MAX_ITER) for fraction in [0.75]
+                    int(fraction * cfg.SOLVER.MAX_ITER) for fraction in [0.25, 0.75]
                 ]
             else:
                 start_step = 1 - values["reduce_lr"]
