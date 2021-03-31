@@ -42,6 +42,7 @@ from autoaugment import ImageNetPolicy
 from colour import cctf_encoding
 from colour.utilities import as_float_array
 from colour_demosaicing import demosaicing_CFA_Bayer_bilinear, mosaicing_CFA_Bayer
+from imgaug import augmenters as iaa
 from imgaug.random import seed as imgaug_seed
 from skimage.restoration import denoise_wavelet
 from skimage.util import random_noise
@@ -72,14 +73,102 @@ class ReturnTransform(Transform):
 
 class AutoAugment(Augmentation):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._init(locals())
         self.policy = ImageNetPolicy()
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         return ReturnTransform(
             image=np.asarray(self.policy(Image.fromarray(image))))
+
+
+class AAEAugment(Augmentation):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._init(locals())
+        self.aug = [
+            # Convert some images into their superpixel representation,
+            # sample between 20 and 200 superpixels per image, but do
+            # not replace all superpixels with their average, only
+            # some of them (p_replace).
+            iaa.Sometimes(
+                0.5, iaa.Superpixels(p_replace=(0, 1.0), n_segments=(20, 200))),
+
+            # Blur each image with varying strength using
+            # gaussian blur (sigma between 0 and 3.0),
+            # average/uniform blur (kernel size between 2x2 and 7x7)
+            # median blur (kernel size between 3x3 and 11x11).
+            iaa.OneOf([
+                iaa.GaussianBlur((0, 3.0)),
+                iaa.AverageBlur(k=(2, 7)),
+                iaa.MedianBlur(k=(3, 11)),
+            ]),
+
+            # Sharpen each image, overlay the result with the original
+            # image using an alpha between 0 (no sharpening) and 1
+            # (full sharpening effect).
+            iaa.Sharpen(alpha=(0, 1.0), lightness=(0.75, 1.5)),
+
+            # Same as sharpen, but for an embossing effect.
+            iaa.Emboss(alpha=(0, 1.0), strength=(0, 2.0)),
+
+            # Search in some images either for all edges or for
+            # directed edges. These edges are then marked in a black
+            # and white image and overlayed with the original image
+            # using an alpha of 0 to 0.7.
+            iaa.Sometimes(
+                0.5,
+                iaa.OneOf([
+                    iaa.EdgeDetect(alpha=(0, 0.7)),
+                    iaa.DirectedEdgeDetect(alpha=(0, 0.7),
+                                           direction=(0.0, 1.0)),
+                ])),
+
+            # Add gaussian noise to some images.
+            # In 50% of these cases, the noise is randomly sampled per
+            # channel and pixel.
+            # In the other 50% of all cases it is sampled once per
+            # pixel (i.e. brightness change).
+            iaa.AdditiveGaussianNoise(loc=0,
+                                      scale=(0.0, 0.05 * 255),
+                                      per_channel=0.5),
+
+            # Either drop randomly 1 to 10% of all pixels (i.e. set
+            # them to black) or drop them on an image with 2-5% percent
+            # of the original size, leading to large dropped
+            # rectangles.
+            iaa.OneOf([
+                iaa.Dropout((0.01, 0.1), per_channel=0.5),
+                iaa.CoarseDropout((0.03, 0.15),
+                                  size_percent=(0.02, 0.05),
+                                  per_channel=0.2),
+            ]),
+
+            # Invert each image's channel with 5% probability.
+            # This sets each pixel value v to 255-v.
+            iaa.Invert(0.05, per_channel=True),  # invert color channels
+
+            # Add a value of -10 to 10 to each pixel.
+            iaa.Add((-10, 10), per_channel=0.5),
+
+            # Change brightness of images (50-150% of original value).
+            iaa.Multiply((0.5, 1.5), per_channel=0.5),
+
+            # Improve or worsen the contrast of images.
+            iaa.LinearContrast((0.5, 2.0), per_channel=0.5),
+
+            # Convert each image to grayscale and then overlay the
+            # result with the original with random alpha. I.e. remove
+            # colors with varying strengths.
+            iaa.Grayscale(alpha=(0.0, 1.0))
+        ]
+
+    def get_transform(self, image) -> Transform:
+        seq = iaa.Sequential(
+            random.sample(self.aug, random.randint(0, len(self.aug))))
+        return ReturnTransform(image=seq.augment_image(image))
 
 
 class Mosaic(Augmentation):
@@ -88,7 +177,7 @@ class Mosaic(Augmentation):
         super().__init__()
         self._init(locals())
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         img = image.copy().astype(float)[:, :, ::-1] / 255.0
         cfa = mosaicing_CFA_Bayer(img, self.pattern)
         img = np.clip(
@@ -117,7 +206,7 @@ class Denoise(Augmentation):
             )
         return (img * 255.0).astype(np.uint8)
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         return ReturnTransform(image=self._run(image))
 
 
@@ -166,7 +255,7 @@ class AddNoise(Augmentation):
                 raise ValueError("Unknown noise type: {}".format(_type))
         return (noise * 255.0).astype(np.uint8)
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         return ReturnTransform(image=self._run(image))
 
 
@@ -187,7 +276,7 @@ class Photometric(Augmentation):
         else:
             return self.amount
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         composition = list()
         if self.random_types:
             types = random.sample(self.types,
@@ -239,7 +328,7 @@ class Cutout(Augmentation):
             p=p,
         )
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         return ReturnTransform(image=self.cutout(image=image)["image"])
 
 
@@ -254,7 +343,7 @@ class Flip(Augmentation):
         super().__init__()
         self._init(locals())
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         h, w = image.shape[:2]
         do = self._rand_range() < self.p
         if do:
@@ -284,7 +373,7 @@ class Vignetting(Augmentation):
         super().__init__()
         self._init(locals())
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         img = image.copy().astype(float) / 255.0
         h, w = image.shape[:2]
         min_dist = np.array([h, w
@@ -320,7 +409,7 @@ class ChromaticAberration(Augmentation):
         super().__init__()
         self._init(locals())
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         img = Image.fromarray(image).convert("RGB")
         r, g, b = img.split()
         rdata = np.asarray(r)
@@ -384,7 +473,7 @@ class ApplyAEAug(Augmentation):
 
         self.aug = ae_aug(**kwargs)
 
-    def get_transform(self, image):
+    def get_transform(self, image) -> Transform:
         return ReturnTransform(
             image=self.aug(image=image, **self.kwargs)["image"])
 
@@ -564,6 +653,8 @@ class Trainer(DefaultTrainer):
                 Cutout(holes=cfg.CUTOUT_HOLES,
                        size=cfg.CUTOUT_SIZES,
                        p=cfg.CUTOUT))
+        if cfg.AAE:
+            augmentations.append(AAEAugment())
         mapper = DatasetMapper(
             is_train=True,
             use_instance_mask=cfg.MODEL.MASK_ON,
@@ -1142,7 +1233,7 @@ def build_config(
     cfg.VIGNETTE = 0.0  # (0., 0.8)
     cfg.CHROMATIC_ABERRATION = 0.0  # (0., 0.5)
     cfg.AUTO_AUGMENT = False
-    # gaussian blur, contrast, brightness, color and sharpness filters, cutout
+    cfg.AAE = True 
 
     cfg.OUTPUT_DIR = output_dir
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)

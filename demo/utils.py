@@ -1,6 +1,7 @@
 import numpy as np
 
 import skopt
+from typing import Any
 
 
 def get_results_dict() -> dict:
@@ -20,6 +21,15 @@ def get_results_dict() -> dict:
         ],
         "case_front3d_v2": [
             61.01553947, 55.58437218, 49.60603806, 49.53397071, 46.5568013
+        ],
+        "case_front3d_haven": [
+            61.96609497, 58.79461317, 55.62541417, 50.06178549, 49.31000245
+        ],
+        "case_front3d_b": [
+            64.04062038, 57.96809713, 57.21279704, 54.31943874, 50.49968236
+        ],
+        "case_front3d_a": [
+            62.8612593, 60.40714259, 50.52970971, 50.20810414, 47.52600713
         ],
         "case_front3d": [
             62.02147473, 53.78759735, 53.63398144, 44.57640408, 41.05447549
@@ -269,11 +279,11 @@ def get_space() -> list:
 
 
 @skopt.utils.use_named_args(dimensions=get_space())
-def get_param_names(**params) -> list:
+def get_param_names(**params: Any) -> list:
     return list(params.keys())
 
 
-def set_cfg_values(cfg, values):
+def set_cfg_values(cfg, values: dict) -> None:
     # Typecast to standard Python types if not already
     for k, v in values.items():
         try:
@@ -301,7 +311,8 @@ def set_cfg_values(cfg, values):
         if values["reduce_lr"] != 0.0:
             if values["reduce_lr"] == 0.1:
                 cfg.SOLVER.STEPS = [
-                    int(fraction * cfg.SOLVER.MAX_ITER) for fraction in [0.25, 0.75]
+                    int(fraction * cfg.SOLVER.MAX_ITER)
+                    for fraction in [0.25, 0.75]
                 ]
             else:
                 start_step = 1 - values["reduce_lr"]
@@ -400,3 +411,28 @@ def set_cfg_values(cfg, values):
     if "invert" in values:
         if values["invert"] <= 1.0:
             cfg.INVERT = values["invert"]
+
+
+def get_train_params(model: str) -> dict:
+    if model.lower() in ["retinanet", "retina"]:
+        params = {
+            "learning_rate": 0.000295352,
+            "weight_decay": 0.0001,
+            "epochs": 3,
+            "batch_size": 8,
+            "weights": "imagenet",
+            "warmup_fraction": 0.1,
+            "reduce_lr": 0.99
+        }
+    elif model.lower() in ["faster_rcnn"]:
+        params = {
+            "learning_rate": 74293e-05,
+            "weight_decay": 1e-09,
+            "epochs": 5,
+            "batch_size": 4,
+            "weights": "imagenet",
+            "warmup_fraction": 0.1,
+            "reduce_lr": 0.99
+        }
+
+    return params
