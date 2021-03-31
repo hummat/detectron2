@@ -232,8 +232,8 @@ def parse_data(data: list, dataset_names: list) -> list:
             best_datasets = list()
             for k, v in get_results_dict().items():
                 best_datasets.append([np.mean(v), np.max(v)])
-            best_mean = np.quantile(np.array(best_datasets)[:, 0], q=.9)
-            best_max = np.quantile(np.array(best_datasets)[:, 1], q=.9)
+            best_mean = np.quantile(np.array(best_datasets)[:, 0], q=.95)
+            best_max = np.quantile(np.array(best_datasets)[:, 1], q=.95)
             for k, v in get_results_dict().items():
                 if np.mean(v) >= best_mean or np.max(v) >= best_max:
                     train_datasets.append(k)
@@ -249,13 +249,12 @@ def parse_data(data: list, dataset_names: list) -> list:
 def get_space() -> list:
     space = [
         skopt.space.Real(1e-6, 1e-3, name="learning_rate", prior='log-uniform'),
-        skopt.space.Categorical(
-            [0.0, 1e-10, 1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
-            name="weight_decay"),
         # skopt.space.Categorical([True, False], name="random_data"),
         skopt.space.Categorical([1, 2, 3, 5], name="epochs"),
         skopt.space.Categorical([2, 4, 8], name="batch_size"),
         skopt.space.Categorical(["coco", "imagenet", "none"], name="weights"),
+        skopt.space.Categorical(["WarmupMultiStepLR", "WarmupCosineLR"],
+                                name="lr_scheduler"),
         # skopt.space.Real(0.0, 2.0, name="photometric"),
         # skopt.space.Categorical([True, False], name="random_types"),
         # skopt.space.Categorical([True, False], name="cam_noise"),
@@ -270,10 +269,10 @@ def get_space() -> list:
         # skopt.space.Real(0.0, 2.0, name="hist"),
         # skopt.space.Categorical([True, False], name="vignette"),
         # skopt.space.Categorical([True, False], name="chromatic"),
-        skopt.space.Categorical([0.0, 0.1, 0.2, 0.3], name="warmup_fraction"),
+        skopt.space.Categorical([0.0, 0.1, 0.2, 0.3, 0.4, 0.5],
+                                name="warmup_fraction"),
         skopt.space.Categorical([0.0, 0.1, 0.9, 0.99], name="reduce_lr"),
-        skopt.space.Categorical(["retinanet", "mask_rcnn", "faster_rcnn"],
-                                name="model")
+        skopt.space.Categorical(["retinanet", "mask_rcnn"], name="model")
     ]
     return space
 

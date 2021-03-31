@@ -94,7 +94,7 @@ class AAEAugment(Augmentation):
             # not replace all superpixels with their average, only
             # some of them (p_replace).
             iaa.Sometimes(
-                0.5, iaa.Superpixels(p_replace=(0, 1.0), n_segments=(20, 200))),
+                0.5, iaa.Superpixels(p_replace=(0, 0.5), n_segments=(20, 200))),
 
             # Blur each image with varying strength using
             # gaussian blur (sigma between 0 and 3.0),
@@ -166,8 +166,7 @@ class AAEAugment(Augmentation):
         ]
 
     def get_transform(self, image) -> Transform:
-        seq = iaa.Sequential(
-            random.sample(self.aug, random.randint(0, len(self.aug))))
+        seq = iaa.Sequential(random.sample(self.aug, random.randint(0, len(self.aug))))
         return ReturnTransform(image=seq.augment_image(image))
 
 
@@ -1233,7 +1232,7 @@ def build_config(
     cfg.VIGNETTE = 0.0  # (0., 0.8)
     cfg.CHROMATIC_ABERRATION = 0.0  # (0., 0.5)
     cfg.AUTO_AUGMENT = False
-    cfg.AAE = True 
+    cfg.AAE = True
 
     cfg.OUTPUT_DIR = output_dir
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
