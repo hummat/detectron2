@@ -114,6 +114,8 @@ def get_space() -> list:
     space = [
         skopt.space.Real(1e-6, 1e-3, name="learning_rate", prior='log-uniform'),
         skopt.space.Real(1e-15, 1e-3, name="weight_decay", prior='log-uniform'),
+        skopt.space.Categorical(["adam", "sgd"], name="optimizer"),
+        skopt.space.Categorical([0.0, 0.9, 0.99], name="momentum"),
         # skopt.space.Categorical([True, False], name="random_data"),
         skopt.space.Categorical([1, 2, 3, 5], name="epochs"),
         skopt.space.Categorical([0.0, 0.25, 0.5, 0.9], name="random_crop"),
@@ -174,7 +176,7 @@ def set_cfg_values(cfg, values: dict) -> None:
     if "reduce_lr" in values:
         if values["reduce_lr"] != 0.0:
             if values["reduce_lr"] == 0.1:
-                cfg.SOLVER.STEPS = [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in [0.25, 0.75]]
+                cfg.SOLVER.STEPS = [int(fraction * cfg.SOLVER.MAX_ITER) for fraction in [0.5, 0.75]]
             else:
                 start_step = 1 - values["reduce_lr"]
                 cfg.SOLVER.STEPS = [
@@ -208,7 +210,7 @@ def set_cfg_values(cfg, values: dict) -> None:
     #     cfg.INPUT.CROP.ENABLED = True if values["random_crop"] != 1.0 else False
     #     cfg.INPUT.CROP.SIZE = [values["random_crop"], values["random_crop"]]
     if "random_crop" in values:
-        cfg.CROP = values["crop"]
+        cfg.CROP = values["random_crop"]
     if "rotate" in values:
         cfg.ROTATE = values["rotate"] if values["batch_size"] <= 4 else False
 
