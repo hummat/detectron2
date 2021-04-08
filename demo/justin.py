@@ -79,8 +79,7 @@ class AutoAugment(Augmentation):
         self.policy = ImageNetPolicy()
 
     def get_transform(self, image) -> Transform:
-        return ReturnTransform(
-            image=np.asarray(self.policy(Image.fromarray(image))))
+        return ReturnTransform(image=np.asarray(self.policy(Image.fromarray(image))))
 
 
 class AAEAugment(Augmentation):
@@ -93,8 +92,7 @@ class AAEAugment(Augmentation):
             # sample between 20 and 200 superpixels per image, but do
             # not replace all superpixels with their average, only
             # some of them (p_replace).
-            iaa.Sometimes(
-                0.5, iaa.Superpixels(p_replace=(0, 0.5), n_segments=(20, 200))),
+            iaa.Sometimes(0.5, iaa.Superpixels(p_replace=(0, 0.5), n_segments=(20, 200))),
 
             # Blur each image with varying strength using
             # gaussian blur (sigma between 0 and 3.0),
@@ -122,8 +120,7 @@ class AAEAugment(Augmentation):
                 0.5,
                 iaa.OneOf([
                     iaa.EdgeDetect(alpha=(0, 0.7)),
-                    iaa.DirectedEdgeDetect(alpha=(0, 0.7),
-                                           direction=(0.0, 1.0)),
+                    iaa.DirectedEdgeDetect(alpha=(0, 0.7), direction=(0.0, 1.0)),
                 ])),
 
             # Add gaussian noise to some images.
@@ -131,9 +128,7 @@ class AAEAugment(Augmentation):
             # channel and pixel.
             # In the other 50% of all cases it is sampled once per
             # pixel (i.e. brightness change).
-            iaa.AdditiveGaussianNoise(loc=0,
-                                      scale=(0.0, 0.05 * 255),
-                                      per_channel=0.5),
+            iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5),
 
             # Either drop randomly 1 to 10% of all pixels (i.e. set
             # them to black) or drop them on an image with 2-5% percent
@@ -141,9 +136,7 @@ class AAEAugment(Augmentation):
             # rectangles.
             iaa.OneOf([
                 iaa.Dropout((0.01, 0.1), per_channel=0.5),
-                iaa.CoarseDropout((0.03, 0.15),
-                                  size_percent=(0.02, 0.05),
-                                  per_channel=0.2),
+                iaa.CoarseDropout((0.03, 0.15), size_percent=(0.02, 0.05), per_channel=0.2),
             ]),
 
             # Invert each image's channel with 5% probability.
@@ -180,9 +173,7 @@ class Mosaic(Augmentation):
         img = image.copy().astype(float)[:, :, ::-1] / 255.0
         cfa = mosaicing_CFA_Bayer(img, self.pattern)
         img = np.clip(
-            as_float_array(
-                cctf_encoding(demosaicing_CFA_Bayer_bilinear(cfa,
-                                                             self.pattern))),
+            as_float_array(cctf_encoding(demosaicing_CFA_Bayer_bilinear(cfa, self.pattern))),
             0,
             1,
         )[:, :, ::-1]
@@ -233,8 +224,7 @@ class AddNoise(Augmentation):
     def _run(self, img):
         noise = img.copy().astype(float) / 255.0
         if self.random_types:
-            types = random.sample(self.types,
-                                  random.randint(0, len(self.types)))
+            types = random.sample(self.types, random.randint(0, len(self.types)))
         else:
             types = self.types
 
@@ -247,9 +237,7 @@ class AddNoise(Augmentation):
                 w = min(1.0, 1000.0 * self._get_amount())
                 noise = random_noise(noise, _type) * w + (1.0 - w) * noise
             elif _type == "s&p":
-                noise = random_noise(noise,
-                                     _type,
-                                     amount=0.1 * self._get_amount())
+                noise = random_noise(noise, _type, amount=0.1 * self._get_amount())
             else:
                 raise ValueError("Unknown noise type: {}".format(_type))
         return (noise * 255.0).astype(np.uint8)
@@ -278,28 +266,21 @@ class Photometric(Augmentation):
     def get_transform(self, image) -> Transform:
         composition = list()
         if self.random_types:
-            types = random.sample(self.types,
-                                  random.randint(0, len(self.types)))
+            types = random.sample(self.types, random.randint(0, len(self.types)))
         else:
             types = list(self.types)
 
         if "brightness" in types:
             offset = self._get_amount(self.types.index("brightness"))
-            composition.append(
-                transforms.RandomBrightness(1.0 - min(offset, 0.5),
-                                            1.0 + min(offset, 0.5)))
+            composition.append(transforms.RandomBrightness(1.0 - min(offset, 0.5), 1.0 + min(offset, 0.5)))
         if "contrast" in types:
             offset = self._get_amount(self.types.index("contrast"))
-            composition.append(
-                transforms.RandomContrast(1.0 - offset, 1.0 + offset))
+            composition.append(transforms.RandomContrast(1.0 - offset, 1.0 + offset))
         if "lighting" in types:
-            composition.append(
-                transforms.RandomLighting(
-                    self._get_amount(self.types.index("lighting"))))
+            composition.append(transforms.RandomLighting(self._get_amount(self.types.index("lighting"))))
         if "saturation" in types:
             offset = self._get_amount(self.types.index("saturation"))
-            composition.append(
-                transforms.RandomSaturation(1.0 - offset, 1.0 + offset))
+            composition.append(transforms.RandomSaturation(1.0 - offset, 1.0 + offset))
 
         random.shuffle(composition)
         augs = transforms.AugmentationList(composition)
@@ -308,11 +289,7 @@ class Photometric(Augmentation):
 
 class Cutout(Augmentation):
 
-    def __init__(self,
-                 holes=(8, None),
-                 size=(8, 8, None, None),
-                 fill_value=0,
-                 p=0.5):
+    def __init__(self, holes=(8, None), size=(8, 8, None, None), fill_value=0, p=0.5):
         super().__init__()
         self._init(locals())
 
@@ -347,12 +324,8 @@ class Flip(Augmentation):
         do = self._rand_range() < self.p
         if do:
             if self.flip_vertically and self.flip_horizontally:
-                flips = [
-                    transforms.HFlipTransform(w),
-                    transforms.VFlipTransform(h)
-                ]
-                return transforms.TransformList(
-                    random.sample(flips, random.randint(1, 2)))
+                flips = [transforms.HFlipTransform(w), transforms.VFlipTransform(h)]
+                return transforms.TransformList(random.sample(flips, random.randint(1, 2)))
             elif self.flip_horizontally:
                 return transforms.HFlipTransform(w)
             elif self.flip_vertically:
@@ -375,12 +348,10 @@ class Vignetting(Augmentation):
     def get_transform(self, image) -> Transform:
         img = image.copy().astype(float) / 255.0
         h, w = image.shape[:2]
-        min_dist = np.array([h, w
-                            ]) / 2 * np.random.random() * self.ratio_min_dist
+        min_dist = np.array([h, w]) / 2 * np.random.random() * self.ratio_min_dist
 
         # create matrix of distance from the center on the two axis
-        x, y = np.meshgrid(np.linspace(-w / 2, w / 2, w),
-                           np.linspace(-h / 2, h / 2, h))
+        x, y = np.meshgrid(np.linspace(-w / 2, w / 2, w), np.linspace(-h / 2, h / 2, h))
         x, y = np.abs(x), np.abs(y)
 
         # create the vignette mask on the two axis
@@ -423,19 +394,15 @@ class ChromaticAberration(Augmentation):
             strength = self.strength
         gfinal = gfinal.resize(
             (
-                round(
-                    (1 + random.uniform(0, 0.018) * strength) * rdata.shape[1]),
-                round(
-                    (1 + random.uniform(0, 0.018) * strength) * rdata.shape[0]),
+                round((1 + random.uniform(0, 0.018) * strength) * rdata.shape[1]),
+                round((1 + random.uniform(0, 0.018) * strength) * rdata.shape[0]),
             ),
             Image.LANCZOS,
         )
         bfinal = bfinal.resize(
             (
-                round(
-                    (1 + random.uniform(0, 0.044) * strength) * rdata.shape[1]),
-                round(
-                    (1 + random.uniform(0, 0.044) * strength) * rdata.shape[0]),
+                round((1 + random.uniform(0, 0.044) * strength) * rdata.shape[1]),
+                round((1 + random.uniform(0, 0.044) * strength) * rdata.shape[0]),
             ),
             Image.LANCZOS,
         )
@@ -451,16 +418,12 @@ class ChromaticAberration(Augmentation):
         img = Image.merge(
             "RGB",
             (
-                rfinal.crop(
-                    (-rwdiff, -rhdiff, bwidth - rwdiff, bheight - rhdiff)),
-                gfinal.crop(
-                    (-gwdiff, -ghdiff, bwidth - gwdiff, bheight - ghdiff)),
+                rfinal.crop((-rwdiff, -rhdiff, bwidth - rwdiff, bheight - rhdiff)),
+                gfinal.crop((-gwdiff, -ghdiff, bwidth - gwdiff, bheight - ghdiff)),
                 bfinal,
             ),
         )
-        img = np.asarray(
-            img.crop((rwdiff, rhdiff, rwidth + rwdiff,
-                      rheight + rhdiff)))[:, :, ::-1]
+        img = np.asarray(img.crop((rwdiff, rhdiff, rwidth + rwdiff, rheight + rhdiff)))[:, :, ::-1]
         return ReturnTransform(image=img)
 
 
@@ -473,8 +436,7 @@ class ApplyAEAug(Augmentation):
         self.aug = ae_aug(**kwargs)
 
     def get_transform(self, image) -> Transform:
-        return ReturnTransform(
-            image=self.aug(image=image, **self.kwargs)["image"])
+        return ReturnTransform(image=self.aug(image=image, **self.kwargs)["image"])
 
 
 class Trainer(DefaultTrainer):
@@ -515,11 +477,7 @@ class Trainer(DefaultTrainer):
                     elif key == "bias":
                         lr = cfg.SOLVER.BASE_LR * cfg.SOLVER.BIAS_LR_FACTOR
                         weight_decay = cfg.SOLVER.WEIGHT_DECAY_BIAS
-                    params += [{
-                        "params": [value],
-                        "lr": lr,
-                        "weight_decay": weight_decay
-                    }]
+                    params += [{"params": [value], "lr": lr, "weight_decay": weight_decay}]
 
             optimizer = torch.optim.Adam(params, cfg.SOLVER.BASE_LR)
             optimizer = maybe_add_gradient_clipping(cfg, optimizer)
@@ -558,8 +516,7 @@ class Trainer(DefaultTrainer):
             transforms.ResizeShortestEdge(
                 short_edge_length=cfg.INPUT.MIN_SIZE_TRAIN,
                 max_size=cfg.INPUT.MAX_SIZE_TRAIN,
-                sample_style="range"
-                if len(cfg.INPUT.MIN_SIZE_TRAIN) == 2 else "choice",
+                sample_style="range" if len(cfg.INPUT.MIN_SIZE_TRAIN) == 2 else "choice",
                 interp=cfg.INTERP,
             )
         ]
@@ -573,16 +530,13 @@ class Trainer(DefaultTrainer):
                 warnings.filterwarnings("ignore", category=UserWarning)
             augmentations.append(Flip(*flips))
         if cfg.ROTATE:
-            augmentations.append(
-                transforms.RandomRotation([90, 180, 270, -90, -180, -270],
-                                          sample_style="choice"))
+            augmentations.append(transforms.RandomRotation([90, 180, 270, -90, -180, -270], sample_style="choice"))
+        if cfg.CROP:
+            augmentations.append(transforms.RandomCrop(crop_type="relative_range", crop_size=(cfg.CROP, cfg.CROP)))
         if cfg.INVERT:
             augmentations.append(ApplyAEAug(A.InvertImg, p=cfg.INVERT))
         if cfg.CHANNEL_DROPOUT:
-            augmentations.append(
-                ApplyAEAug(A.ChannelDropout,
-                           channel_drop_range=(1, 2),
-                           p=cfg.CHANNEL_DROPOUT))
+            augmentations.append(ApplyAEAug(A.ChannelDropout, channel_drop_range=(1, 2), p=cfg.CHANNEL_DROPOUT))
         if cfg.GRAYSCALE:
             augmentations.append(ApplyAEAug(A.ToGray, p=cfg.GRAYSCALE))
         if cfg.PHOTOMETRIC:
@@ -597,27 +551,19 @@ class Trainer(DefaultTrainer):
         if cfg.CLAHE:
             augmentations.append(ApplyAEAug(A.CLAHE, p=cfg.CLAHE))
         if cfg.CHROMATIC_ABERRATION:
-            augmentations.append(
-                ChromaticAberration(strength=cfg.CHROMATIC_ABERRATION))
+            augmentations.append(ChromaticAberration(strength=cfg.CHROMATIC_ABERRATION))
         if cfg.VIGNETTE:
             augmentations.append(Vignetting(strength=cfg.VIGNETTE))
         if cfg.MOTION_BLUR:
-            augmentations.append(
-                ApplyAEAug(A.MotionBlur,
-                           blur_limit=cfg.KERNEL_SIZE,
-                           p=cfg.MOTION_BLUR))
+            augmentations.append(ApplyAEAug(A.MotionBlur, blur_limit=cfg.KERNEL_SIZE, p=cfg.MOTION_BLUR))
         if cfg.GAUSSIAN_BLUR:
-            augmentations.append(
-                ApplyAEAug(A.GaussianBlur,
-                           blur_limit=cfg.KERNEL_SIZE,
-                           p=cfg.GAUSSIAN_BLUR))
+            augmentations.append(ApplyAEAug(A.GaussianBlur, blur_limit=cfg.KERNEL_SIZE, p=cfg.GAUSSIAN_BLUR))
         if cfg.NOISE:
-            augmentations.append(
-                AddNoise(
-                    types=cfg.NOISE_TYPES,
-                    amount=cfg.NOISE,
-                    random_types=cfg.RANDOM_TYPES,
-                ))
+            augmentations.append(AddNoise(
+                types=cfg.NOISE_TYPES,
+                amount=cfg.NOISE,
+                random_types=cfg.RANDOM_TYPES,
+            ))
         if cfg.CAM_NOISE:
             augmentations.append(
                 ApplyAEAug(
@@ -629,14 +575,11 @@ class Trainer(DefaultTrainer):
         if cfg.MOSAIC:
             augmentations.append(Mosaic())
         if cfg.SHARPEN:
-            augmentations.append(
-                ApplyAEAug(A.IAASharpen, alpha=cfg.SHARPEN_RANGE,
-                           p=cfg.SHARPEN))
+            augmentations.append(ApplyAEAug(A.IAASharpen, alpha=cfg.SHARPEN_RANGE, p=cfg.SHARPEN))
         if cfg.DENOISE:
             augmentations.append(Denoise())
         if cfg.FDA:
-            augmentations.append(
-                ApplyAEAug(A.FDA, reference_images=cfg.REFERENCE, p=cfg.FDA))
+            augmentations.append(ApplyAEAug(A.FDA, reference_images=cfg.REFERENCE, p=cfg.FDA))
         if cfg.HISTOGRAM:
             augmentations.append(
                 ApplyAEAug(
@@ -648,10 +591,7 @@ class Trainer(DefaultTrainer):
         if cfg.JPEG:
             augmentations.append(ApplyAEAug(A.JpegCompression, p=cfg.JPEG))
         if cfg.CUTOUT:
-            augmentations.append(
-                Cutout(holes=cfg.CUTOUT_HOLES,
-                       size=cfg.CUTOUT_SIZES,
-                       p=cfg.CUTOUT))
+            augmentations.append(Cutout(holes=cfg.CUTOUT_HOLES, size=cfg.CUTOUT_SIZES, p=cfg.CUTOUT))
         if cfg.AAE:
             augmentations.append(AAEAugment())
         mapper = DatasetMapper(
@@ -661,8 +601,7 @@ class Trainer(DefaultTrainer):
             augmentations=augmentations,
             image_format="BGR",
         )
-        return build_detection_train_loader(
-            cfg, mapper=mapper, num_workers=cfg.DATALOADER.NUM_WORKERS)
+        return build_detection_train_loader(cfg, mapper=mapper, num_workers=cfg.DATALOADER.NUM_WORKERS)
 
     @classmethod
     def build_test_loader(cls, cfg, dataset_name):
@@ -681,10 +620,8 @@ class Trainer(DefaultTrainer):
 
 
 def get_justin_dicts(directory: str):
-    img_paths = sorted(
-        glob.glob(os.path.join(directory, "*/*.png"), recursive=True))
-    info_paths = sorted(
-        glob.glob(os.path.join(directory, "*/*.yaml"), recursive=True))
+    img_paths = sorted(glob.glob(os.path.join(directory, "*/*.png"), recursive=True))
+    info_paths = sorted(glob.glob(os.path.join(directory, "*/*.yaml"), recursive=True))
 
     data_dicts = []
     for index, (img_path, info_path) in enumerate(zip(img_paths, info_paths)):
@@ -719,9 +656,7 @@ def get_justin_dicts(directory: str):
 
 
 def save_dicts_as_csv(data_dicts, path=""):
-    with open(os.path.join(path, "data.csv") if path else "data.csv",
-              "w",
-              newline="") as csvfile:
+    with open(os.path.join(path, "data.csv") if path else "data.csv", "w", newline="") as csvfile:
         csvwriter = csv.writer(csvfile)
         for d in data_dicts:
             for obj in d["annotations"]:
@@ -823,8 +758,7 @@ def load_data(data_root, splits=("train", "val", "test", "misc", "justin")):
     for split in splits:
         DatasetCatalog.register(
             f"justin_{split}",
-            lambda split=split: get_justin_dicts(os.path.join(data_root, split)
-                                                ),
+            lambda split=split: get_justin_dicts(os.path.join(data_root, split)),
         )
         MetadataCatalog.get(f"justin_{split}").set(thing_classes=["1"])
 
@@ -872,9 +806,7 @@ def visualize_data(cfg, data_loader):
 
             visualizer = Visualizer(img, metadata=metadata, scale=1.0)
             target_fields = per_image["instances"].get_fields()
-            labels = [
-                metadata.thing_classes[i] for i in target_fields["gt_classes"]
-            ]
+            labels = [metadata.thing_classes[i] for i in target_fields["gt_classes"]]
             vis = visualizer.overlay_instances(
                 labels=labels,
                 boxes=target_fields.get("gt_boxes", None),
@@ -905,12 +837,10 @@ def get_model(cfg):
 
 
 def path_to_checkpoint(cfg, max_ap: float, it_at_max_ap: int) -> str:
-    dataset = cfg.DATASETS.TRAIN[0] if len(
-        cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
+    dataset = cfg.DATASETS.TRAIN[0] if len(cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
     path = os.path.join(
         cfg.OUTPUT_DIR,
-        f"{cfg.BASE_CONFIG.split('/')[-1].strip('.yaml')}_{dataset}_mAP{max_ap:.2f}@it{it_at_max_ap}.pth"
-    )
+        f"{cfg.BASE_CONFIG.split('/')[-1].strip('.yaml')}_{dataset}_mAP{max_ap:.2f}@it{it_at_max_ap}.pth")
     return path
 
 
@@ -920,8 +850,7 @@ def extract_ap(chkpt: str) -> float:
 
 def is_best_checkpoint(cfg, chkpt: str) -> bool:
     model = cfg.BASE_CONFIG.split('/')[-1].strip('.yaml')
-    dataset = cfg.DATASETS.TRAIN[0] if len(
-        cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
+    dataset = cfg.DATASETS.TRAIN[0] if len(cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
 
     # Find current maximum mAP
     max_ap = 0
@@ -937,8 +866,7 @@ def is_best_checkpoint(cfg, chkpt: str) -> bool:
 
 def find_best_checkpoint(cfg) -> str:
     model = cfg.BASE_CONFIG.split('/')[-1].strip('.yaml')
-    dataset = cfg.DATASETS.TRAIN[0] if len(
-        cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
+    dataset = cfg.DATASETS.TRAIN[0] if len(cfg.DATASETS.TRAIN) == 1 else '_'.join(cfg.DATASETS.TRAIN)
 
     max_ap = 0
     best_weights = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
@@ -974,8 +902,7 @@ def train_eval(cfg, resume=False):
         if chkpt.split('_')[-1].strip(".pth").lstrip('0') == str(it_at_max_ap):
             path = path_to_checkpoint(cfg, ap.max(), it_at_max_ap)
             if is_best_checkpoint(cfg, path):
-                logging.getLogger(
-                    name=__file__).info(f"Storing best model at {path}")
+                logging.getLogger(name=__file__).info(f"Storing best model at {path}")
                 torch.save(torch.load(chkpt), path)
 
     del trainer
@@ -988,8 +915,7 @@ def evaluate(cfg, model=None):
         cfg.MODEL.WEIGHTS = find_best_checkpoint(cfg)
         model = get_model(cfg).eval()
     evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], output_dir=cfg.OUTPUT_DIR)
-    val_loader = build_detection_test_loader(
-        cfg, cfg.DATASETS.TEST[0], num_workers=cfg.DATALOADER.NUM_WORKERS)
+    val_loader = build_detection_test_loader(cfg, cfg.DATASETS.TEST[0], num_workers=cfg.DATALOADER.NUM_WORKERS)
     return inference_on_dataset(model, val_loader, evaluator)
 
 
@@ -1018,9 +944,7 @@ def load_datasets(train_root, eval_root):
             path = os.path.join(train_root, name, "coco_data")
             if not os.path.exists(path):
                 path = os.path.join(train_root, name)
-            register_coco_instances(name, {},
-                                    os.path.join(path, "coco_annotations.json"),
-                                    path)
+            register_coco_instances(name, {}, os.path.join(path, "coco_annotations.json"), path)
         break
     names.extend(["justin_val", "justin_test", "justin_train"])
     return names
@@ -1112,9 +1036,7 @@ def compute_data_statistics(loader):
     print(np.histogram(brightness)[0])
 
 
-def load_and_apply_cfg_values(cfg,
-                              output_dir,
-                              results_name="skopt_results.pkl"):
+def load_and_apply_cfg_values(cfg, output_dir, results_name="skopt_results.pkl"):
     res = skopt.load(os.path.join(output_dir, results_name))
     augmentation_values = dict()
     for k, v in zip(get_param_names(get_space()), res.x):
@@ -1143,8 +1065,8 @@ def build_config(
     cfg.INPUT.MAX_SIZE_TRAIN = 1333
     cfg.INPUT.MIN_SIZE_TEST = 800
     cfg.INPUT.MAX_SIZE_TEST = 1333
-    cfg.INPUT.CROP.ENABLED = False
-    cfg.INPUT.CROP.SIZE = [0.9, 0.9]
+    # cfg.INPUT.CROP.ENABLED = False 
+    # cfg.INPUT.CROP.SIZE = [0.9, 0.9]
 
     cfg.SOLVER.IMS_PER_BATCH = int(batch_size)
 
@@ -1180,9 +1102,7 @@ def build_config(
     elif weights.lower() == "imagenet":
         pass
     else:
-        raise ValueError(
-            f"Weights must be one of 'coco', 'imagenet' or 'none', not {weights}"
-        )
+        raise ValueError(f"Weights must be one of 'coco', 'imagenet' or 'none', not {weights}")
 
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.05
     cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
@@ -1220,10 +1140,7 @@ def build_config(
     cfg.CHANNEL_DROPOUT = 0.0
     cfg.HISTOGRAM = []
     cfg.FDA = 0.0
-    cfg.REFERENCE = [
-        sample["file_name"] for sample in random.sample(
-            DatasetCatalog.get(cfg.DATASETS.TEST[0]), 100)
-    ]
+    cfg.REFERENCE = [sample["file_name"] for sample in random.sample(DatasetCatalog.get(cfg.DATASETS.TEST[0]), 100)]
     cfg.SHARPEN = 0.0
     cfg.SHARPEN_RANGE = [0.2, 0.5]
     cfg.CLAHE = 0.0
@@ -1232,7 +1149,8 @@ def build_config(
     cfg.VIGNETTE = 0.0  # (0., 0.8)
     cfg.CHROMATIC_ABERRATION = 0.0  # (0., 0.5)
     cfg.AUTO_AUGMENT = False
-    cfg.AAE = True
+    cfg.AAE = False
+    cfg.CROP = 0.0
 
     cfg.OUTPUT_DIR = output_dir
     os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
@@ -1266,9 +1184,7 @@ def main(seed: int = 42) -> None:
         nargs="+",
         help="List of datasets used for training.",
     )
-    parser.add_argument("--path_prefix",
-                        default="/home/matthias/Data/Ubuntu/data",
-                        type=str)
+    parser.add_argument("--path_prefix", default="/home/matthias/Data/Ubuntu/data", type=str)
     parser.add_argument("--train_dir", default="datasets/case", type=str)
     parser.add_argument("--val_dir", default="datasets/justin", type=str)
     parser.add_argument("--out_dir", default="justin_training", type=str)
@@ -1333,12 +1249,9 @@ def main(seed: int = 42) -> None:
         type=float,
         help="(Fraction of) epochs to train.",
     )
-    parser.add_argument("--visualize",
-                        action="store_true",
-                        help="Visualize training data.")
-    parser.add_argument("--predict",
-                        action="store_true",
-                        help="Visualize predictions.")
+    parser.add_argument("--visualize", action="store_true", help="Visualize training data.")
+    parser.add_argument("--predict", action="store_true", help="Visualize predictions.")
+    parser.add_argument("--train", action="store_true", help="Train only.")
     args = parser.parse_args()
 
     values = {
@@ -1386,8 +1299,7 @@ def main(seed: int = 42) -> None:
         log_file = f"{args.data}.log"
     else:
         log_file = f"{train_datasets[0] if len(train_datasets) == 1 else '_'.join(train_datasets)}.log"
-    logger = setup_logger(output=os.path.join(output_dir, log_file),
-                          name=__file__)
+    logger = setup_logger(output=os.path.join(output_dir, log_file), name=__file__)
 
     cfg = build_config(
         train_datasets,
@@ -1408,6 +1320,9 @@ def main(seed: int = 42) -> None:
         visualize_data(cfg, loader)
     elif args.predict:
         predict(cfg)
+    elif args.train:
+        ap, it = train_eval(cfg)
+        print(np.vstack([ap, it]).T)
     else:
         results = list()
         for s in np.arange(5):
@@ -1420,26 +1335,19 @@ def main(seed: int = 42) -> None:
         results = np.array(results)
 
         ap = results[:, 0]
-        table = tabulate.tabulate(results[ap.argsort()[::-1]],
-                                  headers=["AP", "iter", "seed"])
+        table = tabulate.tabulate(results[ap.argsort()[::-1]], headers=["AP", "iter", "seed"])
 
         logger.info(table)
         logger.info(f"Mean AP: {ap.mean()}")
-        logger.info(
-            f"95% conf. interv.: {t.interval(0.95, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}"
-        )
-        logger.info(
-            f"99% conf. interv.: {t.interval(0.99, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}"
-        )
+        logger.info(f"95% conf. interv.: {t.interval(0.95, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
+        logger.info(f"99% conf. interv.: {t.interval(0.99, len(ap) - 1, loc=np.mean(ap), scale=sem(ap))}")
         logger.info(f"Copy: {np.sort(ap)[::-1]}")
 
         for k, v in get_results_dict().items():
             # The probability to obtain the current result by chance (assuming the same data generating process) is ...
             logger.info(f"Statistics for {cfg.DATASETS.TRAIN[0]} vs {k}:")
             logger.info(ttest_ind(ap, v, equal_var=False))
-            logger.info(
-                f"99% conf. interv. of {k}: {t.interval(0.99, len(v) - 1, loc=np.mean(v), scale=sem(v))}"
-            )
+            logger.info(f"99% conf. interv. of {k}: {t.interval(0.99, len(v) - 1, loc=np.mean(v), scale=sem(v))}")
             # ... or less.
 
         logger.info(f"Runtime: {(time.time() - start) / 60}")
