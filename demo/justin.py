@@ -348,7 +348,8 @@ class Vignetting(Augmentation):
     def get_transform(self, image) -> Transform:
         img = image.copy().astype(float) / 255.0
         h, w = image.shape[:2]
-        min_dist = np.array([h, w]) / 2 * np.random.random() * self.ratio_min_dist
+        min_dist = np.array([h, w]) / 2 * \
+            np.random.random() * self.ratio_min_dist
 
         # create matrix of distance from the center on the two axis
         x, y = np.meshgrid(np.linspace(-w / 2, w / 2, w), np.linspace(-h / 2, h / 2, h))
@@ -490,8 +491,8 @@ class Trainer(DefaultTrainer):
     @classmethod
     def build_evaluator(cls, cfg, dataset_name):
         return COCOEvaluator(
-            cfg.DATASETS.TEST[0],
-            tasks=("bbox",) if "justin" in cfg.DATASETS.TEST[0] else None,
+            dataset_name,
+            tasks=("bbox",) if "justin" in dataset_name else None,
             output_dir=cfg.OUTPUT_DIR,
         )
 
@@ -594,6 +595,7 @@ class Trainer(DefaultTrainer):
             augmentations.append(Cutout(holes=cfg.CUTOUT_HOLES, size=cfg.CUTOUT_SIZES, p=cfg.CUTOUT))
         if cfg.AAE:
             augmentations.append(AAEAugment())
+
         mapper = DatasetMapper(
             is_train=True,
             use_instance_mask=cfg.MODEL.MASK_ON,
@@ -783,14 +785,14 @@ def visualize_results(predictor, dataset="", image_path=""):
 
         for d in data_dicts:
             img = cv2.imread(d["file_name"])
-            outputs = predictor(img[:, :, ::-1])
+            outputs = predictor(img)
             v = Visualizer(img[:, :, ::-1], metadata=metadata)
             out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
             cv2.imshow(str(d["image_id"]), out.get_image()[:, :, ::-1])
             cv2.waitKey(0)
     elif image_path:
         img = cv2.imread(image_path)
-        outputs = predictor(img[:, :, ::-1])
+        outputs = predictor(img)
         v = Visualizer(img[:, :, ::-1])
         out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
         cv2.imshow(image_path, out.get_image()[:, :, ::-1])
@@ -911,20 +913,34 @@ def train_eval(cfg, resume=False):
 
 
 def evaluate(cfg, model=None):
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.8
+    cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
+    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.8
+    cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
+    cfg.TEST.DETECTIONS_PER_IMAGE = 300
+
+    trainer = Trainer(cfg)
     if model is None:
         cfg.MODEL.WEIGHTS = find_best_checkpoint(cfg)
-        model = get_model(cfg).eval()
-    evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], output_dir=cfg.OUTPUT_DIR)
-    val_loader = build_detection_test_loader(cfg, cfg.DATASETS.TEST[0], num_workers=cfg.DATALOADER.NUM_WORKERS)
-    return inference_on_dataset(model, val_loader, evaluator)
+        # model = get_model(cfg).eval()
+        trainer.resume_or_load(resume=False)
+        model = trainer.model.eval()
+
+    # evaluator = COCOEvaluator(cfg.DATASETS.TEST[0], output_dir=cfg.OUTPUT_DIR)
+    # val_loader = build_detection_test_loader(cfg, cfg.DATASETS.TEST[0], num_workers=cfg.DATALOADER.NUM_WORKERS)
+    evaluator = trainer.build_evaluator(cfg, cfg.DATASETS.TEST[0])
+    data_loader = trainer.build_test_loader(cfg, cfg.DATASETS.TEST[0])
+    return inference_on_dataset(model, data_loader, evaluator)
 
 
 def predict(cfg, dataset="", image_path=""):
     cfg.MODEL.WEIGHTS = find_best_checkpoint(cfg)
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.75
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.8
     cfg.MODEL.ROI_HEADS.NMS_THRESH_TEST = 0.5
-    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.75
+    cfg.MODEL.RETINANET.SCORE_THRESH_TEST = 0.8
     cfg.MODEL.RETINANET.NMS_THRESH_TEST = 0.5
+    cfg.TEST.DETECTIONS_PER_IMAGE = 300
+    cfg.TEST.DETECTIONS_PER_IMAGE = 300
     predictor = DefaultPredictor(cfg)
     if dataset:
         visualize_results(predictor, dataset=dataset)
@@ -1065,7 +1081,7 @@ def build_config(
     cfg.INPUT.MAX_SIZE_TRAIN = 1333
     cfg.INPUT.MIN_SIZE_TEST = 800
     cfg.INPUT.MAX_SIZE_TEST = 1333
-    # cfg.INPUT.CROP.ENABLED = False 
+    # cfg.INPUT.CROP.ENABLED = False
     # cfg.INPUT.CROP.SIZE = [0.9, 0.9]
 
     cfg.SOLVER.IMS_PER_BATCH = int(batch_size)
@@ -1179,7 +1195,7 @@ def main(seed: int = 42) -> None:
     parser.add_argument(
         "-d",
         "--data",
-        default=["case_color"],
+        required=True,
         type=str,
         nargs="+",
         help="List of datasets used for training.",
@@ -1251,6 +1267,7 @@ def main(seed: int = 42) -> None:
     )
     parser.add_argument("--visualize", action="store_true", help="Visualize training data.")
     parser.add_argument("--predict", action="store_true", help="Visualize predictions.")
+    parser.add_argument("--evaluate", action="store_true", help="Evaluate on evaluation data.")
     parser.add_argument("--train", action="store_true", help="Train only.")
     args = parser.parse_args()
 
@@ -1320,6 +1337,8 @@ def main(seed: int = 42) -> None:
         visualize_data(cfg, loader)
     elif args.predict:
         predict(cfg)
+    elif args.evaluate:
+        evaluate(cfg)
     elif args.train:
         ap, it = train_eval(cfg)
         print(np.vstack([ap, it]).T)
