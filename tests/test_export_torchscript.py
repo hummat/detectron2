@@ -59,7 +59,7 @@ class TestScripting(unittest.TestCase):
         }
         script_model = scripting_with_instances(model, fields)
 
-        inputs = [{"image": get_sample_coco_image()}]
+        inputs = [{"image": get_sample_coco_image()}] * 2
         with torch.no_grad():
             instance = model.inference(inputs, do_postprocess=False)[0]
             scripted_instance = script_model.inference(inputs, do_postprocess=False)[0]
@@ -77,7 +77,7 @@ class TestScripting(unittest.TestCase):
         script_model = scripting_with_instances(model, fields)
 
         img = get_sample_coco_image()
-        inputs = [{"image": img}]
+        inputs = [{"image": img}] * 2
         with torch.no_grad():
             instance = model(inputs)[0]["instances"]
             scripted_instance = convert_scripted_instances(script_model(inputs)[0])
@@ -178,6 +178,21 @@ class TestTorchscriptUtils(unittest.TestCase):
             dump_torchscript_IR(ts_model, d)
             # check that the files are created
             for name in ["model_ts_code", "model_ts_IR", "model_ts_IR_inlined", "model"]:
+                fname = os.path.join(d, name + ".txt")
+                self.assertTrue(os.stat(fname).st_size > 0, fname)
+
+    def test_dump_IR_function(self):
+        @torch.jit.script
+        def gunc(x, y):
+            return x + y
+
+        def func(x, y):
+            return x + y + gunc(x, y)
+
+        ts_model = torch.jit.trace(func, (torch.rand(3), torch.rand(3)))
+        with tempfile.TemporaryDirectory(prefix="detectron2_test") as d:
+            dump_torchscript_IR(ts_model, d)
+            for name in ["model_ts_code", "model_ts_IR", "model_ts_IR_inlined"]:
                 fname = os.path.join(d, name + ".txt")
                 self.assertTrue(os.stat(fname).st_size > 0, fname)
 
